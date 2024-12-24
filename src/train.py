@@ -71,7 +71,7 @@ def train_knn_classifier(X, y, model_path="../weights/knn.joblib"):
     logging.info(f"KNN model saved to {model_path}")
 
 
-def visualize_embeddings_with_pca(X, y, output_path="PCA.png"):
+def visualize_embeddings_with_pca(X, y, output_path="../plots/PCA.png"):
     """
     Visualizes embeddings using PCA and saves the scatter plot.
 
