@@ -66,8 +66,8 @@ class FaceEncoder:
         Returns:
             np.ndarray: The preprocessed image blob.
         """
-        height, width, _ = image.shape
-        size = max(height, width)
+        [height, width, _] = image.shape
+        size = max((height, width))
         square = np.zeros((size, size, 3), np.float32)
         square[0:height, 0:width] = image
         square = cv2.resize(square, (self.imsize, self.imsize))
@@ -92,5 +92,4 @@ class FaceEncoder:
         x2 = x + w
         y2 = y + h
         cropped_image = image[y:y2, x:x2]
-        cv2.imwrite(f"faces/{x}{y}.jpg", cropped_image)
         return cropped_image

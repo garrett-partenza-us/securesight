@@ -56,7 +56,7 @@ def load_and_process_images(data_dir):
     return np.array(X), np.array(y)
 
 
-def train_knn_classifier(X, y, model_path="knn.joblib"):
+def train_knn_classifier(X, y, model_path="../weights/knn.joblib"):
     """
     Trains a K-Nearest Neighbors (KNN) classifier and saves the model.
 

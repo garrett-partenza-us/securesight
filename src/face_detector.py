@@ -56,13 +56,13 @@ class FaceDetector:
                 - blob (np.ndarray): The preprocessed image blob.
                 - scale (float): The scaling factor for resizing.
         """
-        height, width, channels = image.shape
-        size = max(height, width)
-        square = np.zeros((size, size, 3), np.uint8)
+        [height, width, channels] = image.shape
+        size = max((height, width))
+        square = np.zeros((size, size, 3), np.float32)
         square[0:height, 0:width] = image
         scale = size / self.imsize
         blob = cv2.dnn.blobFromImage(
-            image,
+            square,
             scalefactor=self.pixelscale,
             size=(self.imsize, self.imsize),
             swapRB=True
@@ -89,8 +89,8 @@ class FaceDetector:
         # Iterate through output to collect bounding boxes and confidence scores
         for i in range(rows):
             classes_scores = output[0][i][4:]
-            (_, max_score, _, _) = cv2.minMaxLoc(classes_scores)
-            if max_score >= 0.25:
+            (minScore, maxScore, minClassLoc, (x, maxClassIndex)) = cv2.minMaxLoc(classes_scores)
+            if maxScore >= 0.25:
                 # Convert to x_min, y_min, width, height
                 box = [
                     output[0][i][0] - (0.5 * output[0][i][2]),
@@ -99,7 +99,7 @@ class FaceDetector:
                     output[0][i][3],
                 ]
                 boxes.append(box)
-                scores.append(max_score)
+                scores.append(maxScore)
 
         # Apply NMS (Non-maximum suppression)
         nms = cv2.dnn.NMSBoxes(boxes, scores, 0.25, 0.45, 0.5)
