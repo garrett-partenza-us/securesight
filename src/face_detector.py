@@ -12,7 +12,7 @@ class FaceDetector:
         pixelscale (float): Scaling factor for pixel values.
     """
 
-    def __init__(self, onnx='../weights/yolov11m-face.onnx', imsize=640, pixelscale=1.0/255):
+    def __init__(self, onnx='../weights/yolov11n-face.onnx', imsize=640, pixelscale=1.0/255):
         """
         Initializes the FaceDetector with the given ONNX model and preprocessing parameters.
 
