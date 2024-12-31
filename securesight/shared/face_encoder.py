@@ -11,7 +11,7 @@ class FaceEncoder:
         pixelscale (float): Scaling factor for pixel values.
     """
 
-    def __init__(self, onnx='../weights/inception_resnet_v1.onnx', imsize=224, pixelscale=1.0/255):
+    def __init__(self, onnx='./shared/weights/inception_resnet_v1.onnx', imsize=224, pixelscale=1.0/255):
         """
         Initializes the FaceEncoder with the given ONNX model and preprocessing parameters.
 

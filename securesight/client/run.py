@@ -1,8 +1,10 @@
 import cv2
+import json
 import numpy as np
 import joblib
-from face_detector import FaceDetector
-from face_encoder import FaceEncoder
+import requests
+from shared.face_detector import FaceDetector
+from shared.face_encoder import FaceEncoder
 
 def draw_bounding_box(img, label, confidence, x, y, x_plus_w, y_plus_h):
     """
@@ -25,9 +27,9 @@ def draw_bounding_box(img, label, confidence, x, y, x_plus_w, y_plus_h):
 if __name__ == '__main__':
     detector = FaceDetector()
     encoder = FaceEncoder()
-    KNN = joblib.load("../weights/knn.joblib")
+    KNN = joblib.load("./shared/weights/knn.joblib")
 
-    cap = cv2.VideoCapture("../data/video.mp4")
+    cap = cv2.VideoCapture("./model/data/video.mp4")
 
     while True:
         ret, frame = cap.read()
@@ -45,6 +47,16 @@ if __name__ == '__main__':
         if len(embeddings) > 0:
             # Predict names using KNN
             predictions = KNN.predict(embeddings)
+            # Encrypt embeddings and call API
+            #encrypted_embeddings = encryptor.encrypt(embeddings)
+            response = requests.post(
+                "http://localhost:8080/api/knn",
+                json={"embeddings": json.dumps(list(vec.tolist() for vec in embeddings))}
+            )
+            if response.status_code == 200:
+                print(response.text)
+            else:
+                print(f"Error: {response.status_code}")
 
         detections = []
 
