@@ -10,7 +10,7 @@ def start_client():
 def start_server():
     """Start the Go server."""
     print("Starting Go server...")
-    server_process = subprocess.Popen(["go", "run", "server/main.go"])
+    server_process = subprocess.Popen(["go", "run", "server/main.go server/ops.go"])
     return server_process
 
 def main():

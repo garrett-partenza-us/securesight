@@ -110,5 +110,4 @@ func setup() {
 
 	computeSSDs(query, targets)
 
-
 }

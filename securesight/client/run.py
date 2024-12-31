@@ -28,6 +28,7 @@ if __name__ == '__main__':
     detector = FaceDetector()
     encoder = FaceEncoder()
     KNN = joblib.load("./shared/weights/knn.joblib")
+    PCA = joblib.load("./shared/weights/pca.joblib")
 
     cap = cv2.VideoCapture("./model/data/video.mp4")
 
@@ -43,6 +44,8 @@ if __name__ == '__main__':
 
         # Encode faces
         embeddings = encoder(frame, boxes, nms, scale)
+
+        embeddings = PCA.transform(embeddings)
 
         predictions = []
 

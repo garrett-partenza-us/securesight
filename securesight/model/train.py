@@ -53,6 +53,10 @@ def load_and_process_images(data_dir):
                 except Exception as e:
                     logging.error(f"Failed for image: {path}", exc_info=True)
 
+    pca = PCA(n_components=16)
+    X = pca.fit_transform(X)
+    joblib.dump(pca, './shared/weights/pca.joblib')
+
     return np.array(X), np.array(y)
 
 
