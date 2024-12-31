@@ -1,12 +1,12 @@
 package main
 
 import (
-	"encoding/json"
 	"encoding/csv"
+	"encoding/json"
 	"fmt"
-	"os"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 )
 
@@ -14,11 +14,11 @@ var model KNN
 
 type Response struct {
 	Distances [][]float64 `json:"Distances"`
-	Classes []string `json:"Classes"`
+	Classes   []string    `json:"Classes"`
 }
 
 type KNN struct {
-	Data [][]float64
+	Data    [][]float64
 	Classes []string
 }
 
@@ -42,7 +42,7 @@ func LoadKNN(path string) KNN {
 		}
 		var row []float64
 
-		for i:= 0; i < len(record)-1; i++ {
+		for i := 0; i < len(record)-1; i++ {
 			f, err := strconv.ParseFloat(record[i], 64)
 			if err != nil {
 				panic(err)
@@ -54,15 +54,8 @@ func LoadKNN(path string) KNN {
 		classes = append(classes, class)
 	}
 
-	for _, vec := range matrix {
-		fmt.Println(vec[:5], "...")
-	}
-	for _, class := range classes {
-		fmt.Println(class)
-	}
-
-	return KNN {
-		Data: matrix,
+	return KNN{
+		Data:    matrix,
 		Classes: classes,
 	}
 }
@@ -76,7 +69,7 @@ func ComputeSSD(query []float64, target []float64) float64 {
 	return sum
 }
 
-func (k KNN) Predict(query []float64) []float64{
+func (k KNN) Predict(query []float64) []float64 {
 
 	var distances []float64
 
@@ -90,7 +83,9 @@ func (k KNN) Predict(query []float64) []float64{
 
 func main() {
 
-	model = LoadKNN("./shared/weights/knn.csv")
+	setup()
+
+	model = LoadKNN("/Users/garrett.partenza/projects/securesight/securesight/shared/weights/knn.csv")
 
 	http.HandleFunc("/api/knn", knnHandler)
 
@@ -125,7 +120,7 @@ func knnHandler(w http.ResponseWriter, r *http.Request) {
 
 	response := Response{
 		Distances: distances,
-		Classes: model.Classes,
+		Classes:   model.Classes,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
