@@ -102,7 +102,9 @@ def main():
     Main function to process images, train the model, and visualize results.
     """
     X, y = load_and_process_images(DATA_DIR)
-    np.savetxt("./shared/weights/knn.csv", X, delimiter=",", fmt='%.6f')
+    print(X.shape, y.shape)
+    np.savetxt("./shared/weights/knn.csv", np.append(X.astype(str), y.reshape(-1, 1), axis=1),
+               delimiter=",", fmt="%s")
     train_knn_classifier(X, y)
     visualize_embeddings_with_pca(X, y)
 

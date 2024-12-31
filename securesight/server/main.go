@@ -2,17 +2,95 @@ package main
 
 import (
 	"encoding/json"
+	"encoding/csv"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"log"
 	"net/http"
+	"strconv"
 )
 
+var model KNN
+
 type Response struct {
-	Classes [4]int `json:"message"`
+	Distances [][]float64 `json:"Distances"`
+	Classes []string `json:"Classes"`
+}
+
+type KNN struct {
+	Data [][]float64
+	Classes []string
+}
+
+func LoadKNN(path string) KNN {
+
+	file, err := os.Open(path)
+	if err != nil {
+		panic(err)
+	}
+	defer file.Close()
+
+	reader := csv.NewReader(file)
+
+	var matrix [][]float64
+	var classes []string
+
+	for {
+		record, err := reader.Read()
+		if err != nil {
+			break
+		}
+		var row []float64
+
+		for i:= 0; i < len(record)-1; i++ {
+			f, err := strconv.ParseFloat(record[i], 64)
+			if err != nil {
+				panic(err)
+			}
+			row = append(row, f)
+		}
+		matrix = append(matrix, row)
+		class := record[len(record)-1]
+		classes = append(classes, class)
+	}
+
+	for _, vec := range matrix {
+		fmt.Println(vec[:5], "...")
+	}
+	for _, class := range classes {
+		fmt.Println(class)
+	}
+
+	return KNN {
+		Data: matrix,
+		Classes: classes,
+	}
+}
+
+func ComputeSSD(query []float64, target []float64) float64 {
+	var sum float64
+	for i := range query {
+		var diff float64 = query[i] - target[i]
+		sum += diff * diff
+	}
+	return sum
+}
+
+func (k KNN) Predict(query []float64) []float64{
+
+	var distances []float64
+
+	for _, row := range k.Data {
+		ssd := ComputeSSD(query, row)
+		distances = append(distances, ssd)
+	}
+
+	return distances
 }
 
 func main() {
+
+	model = LoadKNN("./shared/weights/knn.csv")
 
 	http.HandleFunc("/api/knn", knnHandler)
 
@@ -33,29 +111,27 @@ func knnHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	body, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		http.Error(w, "Error reading request body", http.StatusInternalServerError)
+	var queries [][]float64
+	if err := json.NewDecoder(r.Body).Decode(&queries); err != nil {
+		http.Error(w, "Internal sever error", http.StatusInternalServerError)
 		return
 	}
 
-	var data map[string]interface{}
-	err = json.Unmarshal(body, &data)
-	if err != nil {
-		http.Error(w, "Error unmarshalling json", http.StatusInternalServerError)
-		return
+	var distances [][]float64
+	for _, query := range queries {
+		ssd := model.Predict(query)
+		distances = append(distances, ssd)
 	}
-
-	exampleClasses := [4]int{10, 20, 30, 40}
 
 	response := Response{
-		Classes: exampleClasses,
+		Distances: distances,
+		Classes: model.Classes,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 
-	err = json.NewEncoder(w).Encode(response)
+	err := json.NewEncoder(w).Encode(response)
 
 	if err != nil {
 		http.Error(w, "Failed to encoder JSON", http.StatusInternalServerError)

@@ -44,17 +44,25 @@ if __name__ == '__main__':
         # Encode faces
         embeddings = encoder(frame, boxes, nms, scale)
 
+        predictions = []
+
         if len(embeddings) > 0:
             # Predict names using KNN
-            predictions = KNN.predict(embeddings)
+            #predictions = KNN.predict(embeddings)
             # Encrypt embeddings and call API
             #encrypted_embeddings = encryptor.encrypt(embeddings)
             response = requests.post(
                 "http://localhost:8080/api/knn",
-                json={"embeddings": json.dumps(list(vec.tolist() for vec in embeddings))}
+                json=list(vec.tolist() for vec in embeddings)
             )
             if response.status_code == 200:
-                print(response.text)
+                data = response.json()
+                distances = data['Distances']
+                classes = data['Classes']
+                for result in distances:
+                    zipped = list(zip(result, classes))
+                    sorted_zipped = sorted(zipped, key=lambda x: x[0])
+                    predictions.append(sorted_zipped[0][1])
             else:
                 print(f"Error: {response.status_code}")
 
