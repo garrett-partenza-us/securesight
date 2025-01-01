@@ -61,27 +61,6 @@ func LoadKNN(path string) KNN {
 	}
 }
 
-func ComputeSSD(query []float64, target []float64) float64 {
-	var sum float64
-	for i := range query {
-		var diff float64 = query[i] - target[i]
-		sum += diff * diff
-	}
-	return sum
-}
-
-func (k KNN) Predict(query []float64) []float64 {
-
-	var distances []float64
-
-	for _, row := range k.Data {
-		ssd := ComputeSSD(query, row)
-		distances = append(distances, ssd)
-	}
-
-	return distances
-}
-
 func main() {
 
 	context = Setup()
@@ -115,7 +94,6 @@ func knnHandler(w http.ResponseWriter, r *http.Request) {
 
 	var distances [][]float64
 	for _, query := range queries {
-		//ssd := model.Predict(query)
 		ssd := PredictEncrypted(&model, &context, query)
 		distances = append(distances, ssd)
 
