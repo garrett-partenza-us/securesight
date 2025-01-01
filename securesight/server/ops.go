@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"github.com/tuneinsight/lattigo/v6/core/rlwe"
 	"github.com/tuneinsight/lattigo/v6/schemes/ckks"
 )
@@ -43,10 +44,13 @@ func Setup() Context {
 	kgen := rlwe.NewKeyGenerator(params)
 	sk := kgen.GenSecretKeyNew()
 	encryptor := rlwe.NewEncryptor(params, sk)
+	// Secret key: key.Value.P.Coeffs and key.Value.Q.Coeffs
+	// Public key: key.Value[:2].P.Coeffs and key.Value[:2].Q.Coeffs
 	rlk := kgen.GenRelinearizationKeyNew(sk)
 	evk := rlwe.NewMemEvaluationKeySet(rlk)
 	evaluator := ckks.NewEvaluator(params, evk)
 	decryptor := rlwe.NewDecryptor(params, sk)
+	_ = pk
 
 	// Return the fully populated Context
 	return Context{
