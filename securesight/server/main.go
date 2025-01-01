@@ -11,6 +11,7 @@ import (
 )
 
 var model KNN
+var context Context
 
 type Response struct {
 	Distances [][]float64 `json:"Distances"`
@@ -83,7 +84,7 @@ func (k KNN) Predict(query []float64) []float64 {
 
 func main() {
 
-	setup()
+	context = Setup()
 
 	model = LoadKNN("/Users/garrett.partenza/projects/securesight/securesight/shared/weights/knn.csv")
 
@@ -114,9 +115,12 @@ func knnHandler(w http.ResponseWriter, r *http.Request) {
 
 	var distances [][]float64
 	for _, query := range queries {
-		ssd := model.Predict(query)
+		//ssd := model.Predict(query)
+		ssd := PredictEncrypted(&model, &context, query)
 		distances = append(distances, ssd)
+
 	}
+
 
 	response := Response{
 		Distances: distances,

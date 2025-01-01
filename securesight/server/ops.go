@@ -22,7 +22,19 @@ func computeSSDs(query []float64, targets [][]float64) {
 	}
 }
 
-func setup() {
+type Context struct {
+	Params ckks.Parameters
+	Encoder ckks.Encoder
+	Kgen rlwe.KeyGenerator
+	Sk rlwe.SecretKey
+	Encryptor rlwe.Encryptor
+	Rlk rlwe.RelinearizationKey
+	Evk rlwe.MemEvaluationKeySet
+	Evaluator *ckks.Evaluator
+	Decryptor rlwe.Decryptor
+}
+
+func Setup() Context {
 
 	var params ckks.Parameters
 
@@ -41,37 +53,46 @@ func setup() {
 	kgen := rlwe.NewKeyGenerator(params)
 	sk := kgen.GenSecretKeyNew()
 	encryptor := rlwe.NewEncryptor(params, sk)
-
-	query := []float64{1.0, 2.0, 3.0, 4.0}
-
-	plaintextQuery := ckks.NewPlaintext(params, params.MaxLevel())
-	if err = encoder.Encode(query, plaintextQuery); err != nil{
-		panic(err)
-	}
-
-	var ciphertextQuery *rlwe.Ciphertext
-	if ciphertextQuery, err = encryptor.EncryptNew(plaintextQuery); err != nil {
-		panic(err)
-	}
-
-	targets := [][]float64{
-		{1.1, 2.2, 3.3, 4.3},
-		{2.0, 3.0, 4.0, 5.0},
-		{4.0, 1.0, 2.0, 1.0},
-	}
-
 	rlk := kgen.GenRelinearizationKeyNew(sk)
 	evk := rlwe.NewMemEvaluationKeySet(rlk)
 	evaluator := ckks.NewEvaluator(params, evk)
 	decryptor := rlwe.NewDecryptor(params, sk)
 
-	for _, target := range targets {
+	return Context{
+		Params: params,
+		Encoder: *encoder,
+		Kgen: *kgen,
+		Sk: *sk,
+		Encryptor: *encryptor,
+		Rlk: *rlk,
+		Evk: *evk,
+		Evaluator: evaluator,
+		Decryptor: *decryptor,
+	}
 
-		sum, err := evaluator.SubNew(ciphertextQuery, target)
+}
+
+func PredictEncrypted(k *KNN, c *Context, query []float64) []float64 {
+
+	var distances []float64
+
+	plaintextQuery := ckks.NewPlaintext(c.Params, c.Params.MaxLevel())
+	if err := c.Encoder.Encode(query, plaintextQuery); err != nil{
+		panic(err)
+	}
+	
+	ciphertextQuery, err := c.Encryptor.EncryptNew(plaintextQuery)
+	if err != nil {
+		panic(err)
+	}
+
+	for _, target := range k.Data {
+
+		sum, err := c.Evaluator.SubNew(ciphertextQuery, target)
 		if err != nil {
 			panic(err)
 		}
-		prod, err := evaluator.MulRelinNew(sum, sum)
+		prod, err := c.Evaluator.MulRelinNew(sum, sum)
 		if err != nil {
 			panic(err)
 		}
@@ -82,32 +103,32 @@ func setup() {
 		res := prod.CopyNew()
 		for rot := 1; rot < len(query)/2 + 1; rot++ {
 			galEls := []uint64{
-				params.GaloisElement(1*rot),
-				params.GaloisElementForComplexConjugation(),
+				c.Params.GaloisElement(1*rot),
+				c.Params.GaloisElementForComplexConjugation(),
 			}
-			evaluator = evaluator.WithKey(rlwe.NewMemEvaluationKeySet(rlk, kgen.GenGaloisKeysNew(galEls, sk)...))
-			rotatedCiphertext, err := evaluator.RotateNew(res, 1*rot)
+			c.Evaluator = c.Evaluator.WithKey(rlwe.NewMemEvaluationKeySet(&c.Rlk, c.Kgen.GenGaloisKeysNew(galEls, &c.Sk)...))
+			rotatedCiphertext, err := c.Evaluator.RotateNew(res, 1*rot)
 			if err != nil{
 				panic(err)
 			}
-			res, err = evaluator.AddNew(res, rotatedCiphertext)
+			res, err = c.Evaluator.AddNew(res, rotatedCiphertext)
 			if err != nil{
 				panic(err)
 			}
 		}
 
-		decryptedPlaintext := decryptor.DecryptNew(res)
+		decryptedPlaintext := c.Decryptor.DecryptNew(res)
 
 		// Decodes the plaintext
-		have := make([]float64, params.MaxSlots())
-		if err = encoder.Decode(decryptedPlaintext, have); err != nil {
+		have := make([]float64, c.Params.MaxSlots())
+		if err = c.Encoder.Decode(decryptedPlaintext, have); err != nil {
 			panic(err)
 		}
 
-		fmt.Println(have[:4])
+		distances = append(distances, have[0])
 
 	}
 
-	computeSSDs(query, targets)
+	return distances
 
 }

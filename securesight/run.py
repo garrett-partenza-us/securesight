@@ -1,5 +1,6 @@
 import subprocess
 import sys
+import os
 
 def start_client():
     """Start the Python client module."""
@@ -10,7 +11,10 @@ def start_client():
 def start_server():
     """Start the Go server."""
     print("Starting Go server...")
-    server_process = subprocess.Popen(["go", "run", "server/main.go server/ops.go"])
+    # Change the directory to the 'server' folder, where the go.mod file is located
+    os.chdir('server')  # This assumes 'server' is a subfolder of the current working directory
+    # Run the Go server
+    server_process = subprocess.Popen(["go", "run", "main.go", "ops.go"])
     return server_process
 
 def main():
@@ -31,3 +35,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
