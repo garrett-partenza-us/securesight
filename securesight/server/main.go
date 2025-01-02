@@ -96,7 +96,6 @@ func knnHandler(w http.ResponseWriter, r *http.Request) {
 	for _, query := range queries {
 		ssd := PredictEncrypted(&model, &context, query)
 		distances = append(distances, ssd)
-
 	}
 
 

@@ -1,4 +1,5 @@
 import os
+import json
 import copy
 import cv2
 import joblib
@@ -56,6 +57,11 @@ def load_and_process_images(data_dir):
     pca = PCA(n_components=8)
     X = pca.fit_transform(X)
     joblib.dump(pca, './shared/weights/pca.joblib')
+    # Save the principal components and mean as separate JSON file
+    pca_components = pca.components_.tolist()
+    mean = pca.mean_.tolist()
+    with open('./shared/weights/pca_components.json', 'w') as f:
+        json.dump({'components': pca_components, 'mean': mean}, f)
 
     return np.array(X), np.array(y)
 
