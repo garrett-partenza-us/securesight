@@ -81,6 +81,7 @@ class FaceDetector:
                 - boxes (list): List of bounding boxes as [x_min, y_min, width, height].
                 - nms (list): Indices of boxes kept after non-maximum suppression.
         """
+        print(output.shape)
         output = np.array([cv2.transpose(output[0])])
         rows = output.shape[1]
         boxes = []
