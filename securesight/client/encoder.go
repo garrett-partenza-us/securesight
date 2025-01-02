@@ -1,8 +1,8 @@
 package main
 
 import (
-	"image"
 	"gocv.io/x/gocv"
+	"image"
 )
 
 type Encoder struct {
@@ -15,7 +15,6 @@ func NewEncoder(net gocv.Net) Encoder {
 	}
 }
 
-
 func (e *Encoder) Encode(img *gocv.Mat, boxes []image.Rectangle, indices []int) [][]float32 {
 
 	var embeddings [][]float32
@@ -23,7 +22,7 @@ func (e *Encoder) Encode(img *gocv.Mat, boxes []image.Rectangle, indices []int) 
 		index := indices[i]
 		rect := boxes[index]
 		roi := img.Region(rect)
-		
+
 		height, width := roi.Rows(), roi.Cols()
 		maxDim := max(height, width)
 		square := gocv.NewMatWithSize(maxDim, maxDim, gocv.MatTypeCV8UC3)

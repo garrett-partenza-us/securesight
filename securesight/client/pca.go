@@ -1,11 +1,10 @@
 package main
 
 import (
+	"encoding/json"
 	"io/ioutil"
 	"log"
-	"encoding/json"
 )
-
 
 // PCA model representation
 type PCA struct {
@@ -51,4 +50,3 @@ func (p *PCA) Transform(data [][]float32) [][]float32 {
 
 	return transformedData
 }
-

@@ -1,8 +1,8 @@
 package main
 
 import (
-	"image"
 	"gocv.io/x/gocv"
+	"image"
 )
 
 type Detector struct {
@@ -10,7 +10,7 @@ type Detector struct {
 }
 
 func NewDetector(net gocv.Net) Detector {
-	return Detector {
+	return Detector{
 		Net: net,
 	}
 }
@@ -40,16 +40,16 @@ func FormatResultsYOLO(m *gocv.Mat, scale float32) ([]image.Rectangle, []float32
 			confidence := m.GetFloatAt3(0, 4, subSection)
 			if confidence >= 0.25 {
 				// Convert gocv.Rect to image.Rectangle and append to boxes
-				
+
 				x := m.GetFloatAt3(0, 0, subSection)
 				y := m.GetFloatAt3(0, 1, subSection)
 				w := m.GetFloatAt3(0, 2, subSection)
 				h := m.GetFloatAt3(0, 3, subSection)
 
-				x1 := int((x-w/2) * scale)
-				y1 := int((y-h/2) * scale)
-				x2 := int((x+w/2) * scale)
-				y2 := int((y+h/2) * scale)
+				x1 := int((x - w/2) * scale)
+				y1 := int((y - h/2) * scale)
+				x2 := int((x + w/2) * scale)
+				y2 := int((y + h/2) * scale)
 
 				box := image.Rect(x1, y1, x2, y2)
 				boxes = append(boxes, box)
@@ -62,11 +62,7 @@ func FormatResultsYOLO(m *gocv.Mat, scale float32) ([]image.Rectangle, []float32
 	if len(boxes) > 0 {
 		indices = gocv.NMSBoxes(boxes, scores, 0.5, 0.4)
 	}
-	
+
 	return boxes, scores, indices
 
 }
-
-
-
-
