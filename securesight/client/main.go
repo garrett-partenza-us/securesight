@@ -5,12 +5,23 @@ import (
 	"gocv.io/x/gocv"
 	"image"
 	"image/color"
+	"sort"
+	"github.com/tuneinsight/lattigo/v6/core/rlwe"
 )
 
 func main() {
 
-	webcam, _ := gocv.VideoCaptureDevice(0)
-	window := gocv.NewWindow("Webcam")
+	// Open the video file using VideoCaptureFile
+	videoFile := "../model/data/video.mp4"
+	webcam, err := gocv.VideoCaptureFile(videoFile)
+	if err != nil {
+		panic(err)
+	}
+	defer webcam.Close()
+
+	// Create a window to display the video
+	window := gocv.NewWindow("Video Playback")
+	defer window.Close()
 	img := gocv.NewMat()
 
 	yolo_path := "../shared/weights/yolov11n-face.onnx"
@@ -29,6 +40,8 @@ func main() {
 	defer resnet_net.Close()
 	encoder := NewEncoder(resnet_net)
 
+	encryptor := NewEncryptor()
+
 	pca := NewPCA("../shared/weights/pca_components.json")
 
 	for {
@@ -38,23 +51,35 @@ func main() {
 		boxes, _, indices := detector.Detect(&img)
 		embeddings := encoder.Encode(&img, boxes, indices)
 		embeddings = pca.Transform(embeddings)
-		predictions, err := CallAPI(embeddings)
+		var ciphertexts []rlwe.Ciphertext
+		for idx := range embeddings {
+			ciphertext := encryptor.Encrypt(embeddings[idx])
+			ciphertexts = append(ciphertexts, ciphertext)
+		}
+		publicContext := encryptor.NewPublicContext(ciphertexts)
+		serializedPublicContext, err := SerializeObject(publicContext)
 		if err != nil {
 			panic(err)
-			return
 		}
+		responseData, err := CallAPI(serializedPublicContext)
+		if err != nil {
+			panic(err)
+		}
+		distances := encryptor.Decrypt(responseData.Distances)
+		predictions, err := DistancesToClasses(distances, responseData.Classes)
+		fmt.Println(predictions)
 
-		DrawBoxes(&img, predictions, boxes)
+		DrawBoxes(&img, predictions, boxes, indices)
 
 		window.IMShow(img)
 		window.WaitKey(1)
 	}
 }
 
-func DrawBoxes(img *gocv.Mat, predictions []string, boxes []image.Rectangle) {
+func DrawBoxes(img *gocv.Mat, predictions []string, boxes []image.Rectangle, indices []int) {
 
-	for i := 0; i < len(predictions); i++ {
-		rect := boxes[i]
+	for i := 0; i < len(indices); i++ {
+		rect := boxes[indices[i]]
 		gocv.Rectangle(img, rect, color.RGBA{0, 255, 0, 0}, 3)
 		rectCenter := image.Pt((rect.Min.X+rect.Max.X)/2, (rect.Min.Y+rect.Max.Y)/2)
 		text := predictions[i]
@@ -66,4 +91,23 @@ func DrawBoxes(img *gocv.Mat, predictions []string, boxes []image.Rectangle) {
 		textY := rect.Min.Y + textSize.Y + 10 // 10px offset from the top edge
 		gocv.PutText(img, text, image.Pt(textX, textY), fontFace, fontScale, color.RGBA{0, 255, 0, 0}, thickness)
 	}
+}
+
+func DistancesToClasses(d [][]float64, c []string) ([]string, error) {
+	predictions := []string{}
+	for _, distances := range d {
+
+		zipped := make([][2]interface{}, len(distances))
+		for i, distance := range distances {
+			zipped[i] = [2]interface{}{distance, c[i]}
+		}
+
+		sort.Slice(zipped, func(i, j int) bool {
+			return zipped[i][0].(float64) < zipped[j][0].(float64)
+		})
+
+		predictions = append(predictions, zipped[0][1].(string))
+	}
+
+	return predictions, nil
 }

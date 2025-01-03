@@ -15,36 +15,52 @@ func NewEncoder(net gocv.Net) Encoder {
 	}
 }
 
-func (e *Encoder) Encode(img *gocv.Mat, boxes []image.Rectangle, indices []int) [][]float32 {
+func (e *Encoder) Encode(img *gocv.Mat, boxes []image.Rectangle, indices []int) [][]float64 {
+    var embeddings [][]float64
+    for i := range indices {
+        index := indices[i]
+        rect := boxes[index]
+        roi := img.Region(rect)
 
-	var embeddings [][]float32
-	for i := range indices {
-		index := indices[i]
-		rect := boxes[index]
-		roi := img.Region(rect)
+        height, width := roi.Rows(), roi.Cols()
+        maxDim := max(height, width)
 
-		height, width := roi.Rows(), roi.Cols()
-		maxDim := max(height, width)
-		square := gocv.NewMatWithSize(maxDim, maxDim, gocv.MatTypeCV8UC3)
-		roi2 := square.Region(image.Rect(0, 0, width, height))
-		img.CopyTo(&roi2)
-		roi.Close()
-		blob := gocv.BlobFromImage(square, 1.0/255.0, image.Pt(224, 224), gocv.NewScalar(0.485, 0.456, 0.406, 0), false, false)
-		e.Net.SetInput(blob, "")
-		results := e.Net.Forward("")
-		embedding := FormatResultsResNet(&results)
-		embeddings = append(embeddings, embedding)
-	}
+        // Create a new square Mat for each image in the loop
+        square := gocv.NewMatWithSize(maxDim, maxDim, gocv.MatTypeCV8UC3)
 
-	return embeddings
+        // Create a region (roi2) within the square Mat to copy the image data into
+        roi2 := square.Region(image.Rect(0, 0, width, height))
+        
+        // Copy the region of interest (ROI) into the square
+        roi.CopyTo(&roi2)
 
+        // Close roi after use to release resources
+        roi.Close()
+
+        // Normalize and preprocess the image using BlobFromImage
+        blob := gocv.BlobFromImage(square, 1.0/255.0, image.Pt(224, 224), gocv.NewScalar(0.485, 0.456, 0.406, 0), false, false)
+
+        // Pass the blob through the network
+        e.Net.SetInput(blob, "")
+        results := e.Net.Forward("")
+
+        // Process the results to obtain the embedding
+        embedding := FormatResultsResNet(results)
+
+        // Append the embedding to the list of embeddings
+        embeddings = append(embeddings, embedding)
+
+        // Free up memory by closing the square Mat after use
+        square.Close()
+    }
+    return embeddings
 }
 
-func FormatResultsResNet(r *gocv.Mat) []float32 {
+func FormatResultsResNet(r gocv.Mat) []float64 {
 
-	var vec []float32
+	var vec []float64
 	for x := 0; x < r.Cols(); x++ {
-		vec = append(vec, r.GetFloatAt(0, x))
+		vec = append(vec, float64(r.GetFloatAt(0, x)))
 	}
 	return vec
 }

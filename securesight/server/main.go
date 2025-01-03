@@ -1,20 +1,21 @@
 package main
 
 import (
+	"io/ioutil"
 	"encoding/csv"
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"strconv"
+	"github.com/tuneinsight/lattigo/v6/core/rlwe"
 )
 
 var model KNN
-var context Context
+var context PublicContext
 
 type Response struct {
-	Distances [][]float64 `json:"Distances"`
+	Distances [][]rlwe.Ciphertext `json:"Distances"`
 	Classes   []string    `json:"Classes"`
 }
 
@@ -63,8 +64,6 @@ func LoadKNN(path string) KNN {
 
 func main() {
 
-	context = Setup()
-
 	model = LoadKNN("/Users/garrett.partenza/projects/securesight/securesight/shared/weights/knn.csv")
 
 	http.HandleFunc("/api/knn", knnHandler)
@@ -86,31 +85,36 @@ func knnHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var queries [][]float64
-	if err := json.NewDecoder(r.Body).Decode(&queries); err != nil {
-		http.Error(w, "Internal sever error", http.StatusInternalServerError)
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "failed to read body", http.StatusInternalServerError)
 		return
 	}
 
-	var distances [][]float64
-	for _, query := range queries {
-		ssd := PredictEncrypted(&model, &context, query)
-		distances = append(distances, ssd)
+	// Deserialize the data into the struct
+	context, err = DeserializeObject(body)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("failed to deserialize struct: %v", err), http.StatusBadRequest)
+		return
 	}
+
+
+	res := PredictEncrypted(&model, &context)
 
 
 	response := Response{
-		Distances: distances,
+		Distances: res,
 		Classes:   model.Classes,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-
-	err := json.NewEncoder(w).Encode(response)
-
+	// Serialize the response struct
+	serializedResponse, err := SerializeObject(response)
 	if err != nil {
-		http.Error(w, "Failed to encoder JSON", http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("Failed to serialize response: %v", err), http.StatusInternalServerError)
+		return
 	}
 
+	// Set the response content type and send the serialized data back
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Write(serializedResponse)
 }

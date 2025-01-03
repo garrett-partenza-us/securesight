@@ -2,61 +2,59 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"sort"
+	"encoding/gob"
+	"github.com/tuneinsight/lattigo/v6/core/rlwe"
 )
 
 type ResponseData struct {
-	Distances [][]float32 `json:"Distances"`
+	Distances [][]rlwe.Ciphertext `json:"Distances"`
 	Classes   []string    `json:"Classes"`
 }
 
-func CallAPI(embeddings [][]float32) ([]string, error) {
-
-	jsonData, err := json.Marshal(embeddings)
-	if err != nil {
-		return nil, fmt.Errorf("Error marshaling embeddings: %v", err)
-	}
+func CallAPI(serializedData []byte) (ResponseData, error) {
 
 	url := "http://localhost:8080/api/knn"
-	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonData))
+	resp, err := http.Post(url, "application/octet-stream", bytes.NewReader(serializedData))
 	if err != nil {
-		return nil, fmt.Errorf("Error making POST request: %v", err)
+		panic(err)
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Error: received status code %d", resp.StatusCode)
-	}
-
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("Error reading response body: %v", err)
+		panic(err)
 	}
 
-	var responseData ResponseData
-	err = json.Unmarshal(body, &responseData)
+	// Deserialize the data into the struct
+	responseData, err := DeserializeObject(body)
 	if err != nil {
-		return nil, fmt.Errorf("Error unmarshaling response data: %v", err)
+		panic(err)
 	}
 
-	predictions := []string{}
-	for _, distances := range responseData.Distances {
+	return responseData, nil
 
-		zipped := make([][2]interface{}, len(distances))
-		for i, distance := range distances {
-			zipped[i] = [2]interface{}{distance, responseData.Classes[i]}
-		}
+}
 
-		sort.Slice(zipped, func(i, j int) bool {
-			return zipped[i][0].(float32) < zipped[j][0].(float32)
-		})
-
-		predictions = append(predictions, zipped[0][1].(string))
+func SerializeObject(obj interface{}) ([]byte, error) {
+	var buffer bytes.Buffer
+	encoder := gob.NewEncoder(&buffer)
+	err := encoder.Encode(obj)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to serialize object: %v", err)
 	}
+	return buffer.Bytes(), nil
+}
 
-	return predictions, nil
+// Function to deserialize the object
+func DeserializeObject(data []byte) (ResponseData, error) {
+	var obj ResponseData
+	decoder := gob.NewDecoder(bytes.NewReader(data))
+	err := decoder.Decode(&obj)
+	if err != nil {
+		panic(err)
+	}
+	return obj, nil
 }
