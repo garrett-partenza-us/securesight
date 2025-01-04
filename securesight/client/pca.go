@@ -31,7 +31,7 @@ func NewPCA(path string) PCA {
 func (p *PCA) Transform(data [][]float64) [][]float64 {
 	var transformedData [][]float64
 
-	for i:=0; i < len(data); i++ {
+	for i := 0; i < len(data); i++ {
 		row := data[i]
 		// Subtract the mean from each feature in the row
 		subtractedRow := make([]float64, len(row))

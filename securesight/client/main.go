@@ -2,15 +2,18 @@ package main
 
 import (
 	"fmt"
+	"strings"
+	"github.com/tuneinsight/lattigo/v6/core/rlwe"
 	"gocv.io/x/gocv"
 	"image"
 	"image/color"
 	"sort"
-	"github.com/tuneinsight/lattigo/v6/core/rlwe"
+	"time"
 )
 
 func main() {
 
+	fmt.Println(strings.Repeat("-", 20)+"\nStarting client...\n"+strings.Repeat("-", 20))
 	// Open the video file using VideoCaptureFile
 	videoFile := "../model/data/video.mp4"
 	webcam, err := gocv.VideoCaptureFile(videoFile)
@@ -46,7 +49,10 @@ func main() {
 
 	for {
 
+		fmt.Println(strings.Repeat("-", 20)+"\nProcessing frame...\n"+strings.Repeat("-", 20))
 		webcam.Read(&img)
+		
+		startTime := time.Now()
 
 		boxes, _, indices := detector.Detect(&img)
 		embeddings := encoder.Encode(&img, boxes, indices)
@@ -67,9 +73,11 @@ func main() {
 		}
 		distances := encryptor.Decrypt(responseData.Distances)
 		predictions, err := DistancesToClasses(distances, responseData.Classes)
-		fmt.Println(predictions)
 
 		DrawBoxes(&img, predictions, boxes, indices)
+
+		elapsedTime := time.Since(startTime)
+		fmt.Println("Total time to process frame: ", elapsedTime.Milliseconds())
 
 		window.IMShow(img)
 		window.WaitKey(1)

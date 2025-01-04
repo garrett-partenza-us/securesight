@@ -1,6 +1,8 @@
 package main
 
 import (
+	"time"
+	"strings"
 	"io/ioutil"
 	"encoding/csv"
 	"fmt"
@@ -25,6 +27,8 @@ type KNN struct {
 }
 
 func LoadKNN(path string) KNN {
+
+	startTime := time.Now()
 
 	file, err := os.Open(path)
 	if err != nil {
@@ -55,6 +59,8 @@ func LoadKNN(path string) KNN {
 		class := record[len(record)-1]
 		classes = append(classes, class)
 	}
+	elapsedTime := time.Since(startTime)
+	fmt.Println("Total time loading model: ", elapsedTime.Milliseconds())
 
 	return KNN{
 		Data:    matrix,
@@ -78,7 +84,9 @@ func main() {
 
 func knnHandler(w http.ResponseWriter, r *http.Request) {
 
-	fmt.Println("Handling request...")
+	startTime := time.Now()
+
+	fmt.Println(strings.Repeat("-", 20)+"\nProcessing request...\n"+strings.Repeat("-", 20))
 
 	if r.Method != "POST" {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -117,4 +125,7 @@ func knnHandler(w http.ResponseWriter, r *http.Request) {
 	// Set the response content type and send the serialized data back
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Write(serializedResponse)
+
+	elapsedTime := time.Since(startTime)
+	fmt.Println("Total time processing request: ", elapsedTime.Milliseconds())
 }
