@@ -54,7 +54,7 @@ def load_and_process_images(data_dir):
                 except Exception as e:
                     logging.error(f"Failed for image: {path}", exc_info=True)
 
-    pca = PCA(n_components=8)
+    pca = PCA(n_components=27)
     X = pca.fit_transform(X)
     joblib.dump(pca, './shared/weights/pca.joblib')
     # Save the principal components and mean as separate JSON file

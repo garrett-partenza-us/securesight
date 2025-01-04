@@ -71,8 +71,8 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		distances := encryptor.Decrypt(responseData.Distances)
-		predictions, err := DistancesToClasses(distances, responseData.Classes)
+		distances, classes := encryptor.Decrypt(responseData.Distances)
+		predictions, err := DistancesToClasses(distances, classes)
 
 		DrawBoxes(&img, predictions, boxes, indices)
 
@@ -101,13 +101,13 @@ func DrawBoxes(img *gocv.Mat, predictions []string, boxes []image.Rectangle, ind
 	}
 }
 
-func DistancesToClasses(d [][]float64, c []string) ([]string, error) {
+func DistancesToClasses(d [][]float64, c [][]string) ([]string, error) {
 	predictions := []string{}
-	for _, distances := range d {
+	for q, distances := range d {
 
 		zipped := make([][2]interface{}, len(distances))
 		for i, distance := range distances {
-			zipped[i] = [2]interface{}{distance, c[i]}
+			zipped[i] = [2]interface{}{distance, c[q][i]}
 		}
 
 		sort.Slice(zipped, func(i, j int) bool {

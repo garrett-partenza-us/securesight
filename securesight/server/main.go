@@ -10,14 +10,14 @@ import (
 	"net/http"
 	"os"
 	"strconv"
-	"github.com/tuneinsight/lattigo/v6/core/rlwe"
+	//"github.com/tuneinsight/lattigo/v6/core/rlwe"
 )
 
 var model KNN
 var context PublicContext
 
 type Response struct {
-	Distances [][]rlwe.Ciphertext `json:"Distances"`
+	Distances [][]Distance `json:"Distances"`
 	Classes   []string    `json:"Classes"`
 }
 

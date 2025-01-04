@@ -117,18 +117,20 @@ func (c *Context) NewPublicContext(query []rlwe.Ciphertext) PublicContext {
 	}
 }
 
-func (c *Context) Decrypt(res [][]rlwe.Ciphertext) [][]float64 {
+func (c *Context) Decrypt(res [][]Distance) ([][]float64, [][]string) {
 
 	startTime := time.Now()
 
 	var results [][]float64
+	var resultsClasses [][]string
 
 	for _, face := range res {
 		var distances []float64
+		var classes []string
 		for _, target := range face {
 
 			// Decrypt the result back into plaintext
-			decryptedPlaintext := c.Decryptor.DecryptNew(&target)
+			decryptedPlaintext := c.Decryptor.DecryptNew(&target.Distance)
 
 			// Decode the decrypted result into a float64 slice
 			have := make([]float64, c.Params.MaxSlots())
@@ -136,14 +138,24 @@ func (c *Context) Decrypt(res [][]rlwe.Ciphertext) [][]float64 {
 				panic(err)
 			}
 
-			distances = append(distances, have[0])
+			distances = append(distances, sum(have[:4]))
+			classes = append(classes, target.Class)
 
 		}
 		results = append(results, distances)
+		resultsClasses = append(resultsClasses, classes)
 	}
 
 	elapsedTime := time.Since(startTime)
 	fmt.Println("Time to decrypt: ", elapsedTime.Milliseconds())
-	return results
+	return results, resultsClasses
 
+}
+
+func sum(arr []float64) float64 {
+	var total float64
+	for _, num := range arr {
+		total+=num
+	}
+	return total
 }

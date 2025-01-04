@@ -11,8 +11,13 @@ import (
 )
 
 type ResponseData struct {
-	Distances [][]rlwe.Ciphertext `json:"Distances"`
+	Distances [][]Distance `json:"Distances"`
 	Classes   []string            `json:"Classes"`
+}
+
+type Distance struct{
+	Distance rlwe.Ciphertext
+	Class string
 }
 
 func CallAPI(serializedData []byte) (ResponseData, error) {
