@@ -8,8 +8,8 @@ import (
 
 // PCA model representation
 type PCA struct {
-	Components [][]float32 `json:"components"`
-	Mean       []float32   `json:"mean"`
+	Components [][]float64 `json:"components"`
+	Mean       []float64   `json:"mean"`
 }
 
 func NewPCA(path string) PCA {
@@ -28,18 +28,19 @@ func NewPCA(path string) PCA {
 }
 
 // Function to apply PCA transformation
-func (p *PCA) Transform(data [][]float32) [][]float32 {
-	var transformedData [][]float32
+func (p *PCA) Transform(data [][]float64) [][]float64 {
+	var transformedData [][]float64
 
-	for _, row := range data {
+	for i := 0; i < len(data); i++ {
+		row := data[i]
 		// Subtract the mean from each feature in the row
-		subtractedRow := make([]float32, len(row))
+		subtractedRow := make([]float64, len(row))
 		for i := range row {
 			subtractedRow[i] = row[i] - p.Mean[i]
 		}
 
 		// Apply the transformation (multiply by the principal components)
-		transformedRow := make([]float32, len(p.Components))
+		transformedRow := make([]float64, len(p.Components))
 		for i := range p.Components {
 			for j := range subtractedRow {
 				transformedRow[i] += subtractedRow[j] * p.Components[i][j]

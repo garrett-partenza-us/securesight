@@ -1,21 +1,25 @@
 package main
 
 import (
+	"time"
+	"strings"
+	"io/ioutil"
 	"encoding/csv"
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"strconv"
+	"github.com/tuneinsight/lattigo/v6/schemes/ckks"
 )
 
 var model KNN
-var context Context
+var context PublicContext
 
 type Response struct {
-	Distances [][]float64 `json:"Distances"`
+	Distances [][]Distance `json:"Distances"`
 	Classes   []string    `json:"Classes"`
+	Params   ckks.Parameters    `json:"Params"`
 }
 
 type KNN struct {
@@ -24,6 +28,8 @@ type KNN struct {
 }
 
 func LoadKNN(path string) KNN {
+
+	startTime := time.Now()
 
 	file, err := os.Open(path)
 	if err != nil {
@@ -55,6 +61,12 @@ func LoadKNN(path string) KNN {
 		classes = append(classes, class)
 	}
 
+	rows := len(matrix)
+	cols := len(matrix[0])
+	fmt.Printf("KNN model shape: %d x %d\n", rows, cols)
+	elapsedTime := time.Since(startTime)
+	fmt.Println("Total time loading model: ", elapsedTime.Milliseconds())
+
 	return KNN{
 		Data:    matrix,
 		Classes: classes,
@@ -62,8 +74,6 @@ func LoadKNN(path string) KNN {
 }
 
 func main() {
-
-	context = Setup()
 
 	model = LoadKNN("/Users/garrett.partenza/projects/securesight/securesight/shared/weights/knn.csv")
 
@@ -79,38 +89,49 @@ func main() {
 
 func knnHandler(w http.ResponseWriter, r *http.Request) {
 
-	fmt.Println("Handling request...")
+	startTime := time.Now()
+
+	fmt.Println(strings.Repeat("-", 20)+"\nProcessing request...\n"+strings.Repeat("-", 20))
 
 	if r.Method != "POST" {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	var queries [][]float64
-	if err := json.NewDecoder(r.Body).Decode(&queries); err != nil {
-		http.Error(w, "Internal sever error", http.StatusInternalServerError)
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "failed to read body", http.StatusInternalServerError)
 		return
 	}
 
-	var distances [][]float64
-	for _, query := range queries {
-		ssd := PredictEncrypted(&model, &context, query)
-		distances = append(distances, ssd)
+	// Deserialize the data into the struct
+	context, err = DeserializeObject(body)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("failed to deserialize struct: %v", err), http.StatusBadRequest)
+		return
 	}
+
+
+	res, params := PredictEncrypted(&model, &context)
 
 
 	response := Response{
-		Distances: distances,
+		Distances: res,
 		Classes:   model.Classes,
+		Params: params,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-
-	err := json.NewEncoder(w).Encode(response)
-
+	// Serialize the response struct
+	serializedResponse, err := SerializeObject(response)
 	if err != nil {
-		http.Error(w, "Failed to encoder JSON", http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("Failed to serialize response: %v", err), http.StatusInternalServerError)
+		return
 	}
 
+	// Set the response content type and send the serialized data back
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Write(serializedResponse)
+
+	elapsedTime := time.Since(startTime)
+	fmt.Println("Total time processing request: ", elapsedTime.Milliseconds())
 }

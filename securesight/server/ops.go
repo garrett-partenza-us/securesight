@@ -1,147 +1,165 @@
 package main
 
 import (
+	"fmt"
+	"sync"
+	"bytes"
+	"encoding/gob"
+	"sort"
 	"github.com/tuneinsight/lattigo/v6/core/rlwe"
 	"github.com/tuneinsight/lattigo/v6/schemes/ckks"
 )
 
-// Context holds the cryptographic parameters, key management, encryption, decryption,
-// and evaluation structures needed to perform FHE operations.
-type Context struct {
-	Params     ckks.Parameters           // CKKS parameters
-	Encoder    ckks.Encoder              // Encoder for encoding and decoding plaintexts
-	Kgen       rlwe.KeyGenerator         // Key generator for secret and public key generation
-	Sk         rlwe.SecretKey            // Secret key used for encryption and decryption
-	Encryptor  rlwe.Encryptor            // Encryptor used for encryption operations
-	Rlk        rlwe.RelinearizationKey   // Relinearization key for homomorphic multiplication
-	Evk        rlwe.MemEvaluationKeySet  // Memory-based evaluation keys for homomorphic operations
-	Evaluator  *ckks.Evaluator           // Evaluator used for homomorphic operations on ciphertexts
-	Decryptor  rlwe.Decryptor            // Decryptor for decrypting ciphertexts
+// Server side CKKS context
+type PublicContext struct {
+	Params     ckks.Parameters            // CKKS parameters
+	Rlk        rlwe.RelinearizationKey    // Relinearization key for homomorphic multiplication
+	Evk        rlwe.MemEvaluationKeySet   // Memory-based evaluation keys for homomorphic operations
+	Query			 []rlwe.Ciphertext							  // List of encrypted query vectors
 }
 
-// Setup initializes the cryptographic parameters and returns a Context object with
-// the necessary keys, encoder, encryptor, and evaluator to perform FHE operations.
-// 
-// Returns:
-//   - Context: A structure containing all necessary cryptographic objects and settings.
-func Setup() Context {
-	// Initialize CKKS parameters
-	var params ckks.Parameters
-	params, err := ckks.NewParametersFromLiteral(
-		ckks.ParametersLiteral{
-			LogN:            14,                                // log2(ring degree)
-			LogQ: []int{60, 50, 50, 50, 50, 50, 50, 50},        // Moduli sizes for CKKS
-			LogP:            []int{61},                         // Log2 of auxiliary modulus P
-			LogDefaultScale: 45,                                // Default scale factor
-		})
+// Distance of KNN datapoint
+type Distance struct{
+	Distance rlwe.Ciphertext							// Distance from a given target example
+	Class string													// Class of the given target example
+}
+
+type QueryResult struct {
+	Distances []Distance
+	QueryNum  int
+}
+
+// PredictEncrypted calculates the Euclidean distance of encrypted queries in CKKS FHE for a KNN model
+// It performs the calculation concurrently for multiple queries and multiple KNN data points.
+func PredictEncrypted(knnModel *KNN, context *PublicContext) ([][]Distance, ckks.Parameters) {
+	// Initialize evaluator from server-side context for FHE operations
+	evaluator := ckks.NewEvaluator(context.Params, &context.Evk)
+
+	// Channel for collecting results from goroutines
+	resultChannel := make(chan QueryResult, len(context.Query))
+
+	// WaitGroup to manage concurrent execution of query processing
+	var wg sync.WaitGroup
+
+	// Process each encrypted query concurrently
+	for queryIdx, ciphertext := range context.Query {
+		wg.Add(1)
+		go processQuery(ciphertext, queryIdx, knnModel, *evaluator.ShallowCopy(), resultChannel, &wg)
+	}
+
+	// Wait for all query processing goroutines to finish
+	wg.Wait()
+
+	// Close the result channel after all queries are processed
+	close(resultChannel)
+
+	// Collect the results and sort by query index
+	return collectAndSortResults(resultChannel), context.Params
+}
+
+// processQuery calculates the Euclidean distance for a single query against all KNN data points.
+// It runs in a separate goroutine for each query.
+func processQuery(ciphertext rlwe.Ciphertext, queryIdx int, knnModel *KNN, evaluator ckks.Evaluator, resultChannel chan<- QueryResult, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	// Channel for collecting distances of the current query from each target in the KNN model
+	innerResultChannel := make(chan Distance, len(knnModel.Data))
+	var innerWg sync.WaitGroup
+
+	// Process each target in the KNN model concurrently
+	for targetIdx, target := range knnModel.Data {
+		innerWg.Add(1)
+		go processTarget(ciphertext, target, targetIdx, knnModel.Classes, *evaluator.ShallowCopy(), innerResultChannel, &innerWg)
+	}
+
+	// Wait for all target distance calculations to finish
+	innerWg.Wait()
+
+	// Close the inner result channel after all targets have been processed
+	close(innerResultChannel)
+
+	// Collect the distances for the current query
+	var distances []Distance
+	for dist := range innerResultChannel {
+		distances = append(distances, dist)
+	}
+
+	// Send the result for the current query into the main result channel
+	resultChannel <- QueryResult{
+		QueryNum:  queryIdx,
+		Distances: distances,
+	}
+}
+
+// processTarget computes the squared Euclidean distance for a single target and a query.
+// It is executed concurrently for each target in the KNN model.
+func processTarget(ciphertext rlwe.Ciphertext, target []float64, targetIdx int, classes []string, evaluator ckks.Evaluator, resultChannel chan<- Distance, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	// Compute the difference between the query and the target
+	diff, err := evaluator.SubNew(&ciphertext, target)
 	if err != nil {
 		panic(err)
 	}
 
-	// Initialize cryptographic components
-	encoder := ckks.NewEncoder(params)
-	kgen := rlwe.NewKeyGenerator(params)
-	sk := kgen.GenSecretKeyNew()
-	encryptor := rlwe.NewEncryptor(params, sk)
-	// Secret key: key.Value.P.Coeffs and key.Value.Q.Coeffs
-	// Public key: key.Value[:2].P.Coeffs and key.Value[:2].Q.Coeffs
-	rlk := kgen.GenRelinearizationKeyNew(sk)
-	evk := rlwe.NewMemEvaluationKeySet(rlk)
-	evaluator := ckks.NewEvaluator(params, evk)
-	decryptor := rlwe.NewDecryptor(params, sk)
-
-	// Return the fully populated Context
-	return Context{
-		Params:     params,
-		Encoder:    *encoder,
-		Kgen:       *kgen,
-		Sk:         *sk,
-		Encryptor:  *encryptor,
-		Rlk:        *rlk,
-		Evk:        *evk,
-		Evaluator:  evaluator,
-		Decryptor:  *decryptor,
-	}
-}
-
-// PredictEncrypted performs a prediction using encrypted data based on the provided
-// KNN model and the input query. The query is encrypted, evaluated using homomorphic
-// operations, and the distances are decrypted and returned as plaintext.
-// 
-// Parameters:
-//   - k: A pointer to a KNN structure representing the K-Nearest Neighbors model.
-//   - c: A pointer to a Context structure that holds the cryptographic parameters and keys.
-//   - query: A slice of floats representing the input query data.
-// 
-// Returns:
-//   - distances: A slice of floats representing the decrypted distances to each target in KNN.
-func PredictEncrypted(k *KNN, c *Context, query []float64) []float64 {
-	// Initialize a slice to store the distances
-	var distances []float64
-
-	// Create a plaintext for the query
-	plaintextQuery := ckks.NewPlaintext(c.Params, c.Params.MaxLevel())
-	if err := c.Encoder.Encode(query, plaintextQuery); err != nil {
-		panic(err)
-	}
-
-	// Encrypt the query
-	ciphertextQuery, err := c.Encryptor.EncryptNew(plaintextQuery)
+	// Square the difference (compute the squared Euclidean distance)
+	squaredDiff, err := evaluator.MulRelinNew(diff, diff)
 	if err != nil {
 		panic(err)
 	}
 
-	// Loop through each target in the KNN model to calculate distances
-	for _, target := range k.Data {
 
-		// Compute the difference between the query and the target
-		sum, err := c.Evaluator.SubNew(ciphertextQuery, target)
-		if err != nil {
-			panic(err)
-		}
-
-		// Square the difference (multiply it with itself)
-		prod, err := c.Evaluator.MulRelinNew(sum, sum)
-		if err != nil {
-			panic(err)
-		}
-
-		// Create a copy of the product to use for rotations
-		res := prod.CopyNew()
-
-		// Perform rotations and additions to compute distances
-		for rot := 1; rot < len(query)/2+1; rot++ {
-			galEls := []uint64{
-				c.Params.GaloisElement(1 * rot),
-				c.Params.GaloisElementForComplexConjugation(),
-			}
-			// Update the evaluator with the new Galois keys
-			c.Evaluator = c.Evaluator.WithKey(rlwe.NewMemEvaluationKeySet(&c.Rlk, c.Kgen.GenGaloisKeysNew(galEls, &c.Sk)...))
-			// Rotate the ciphertext
-			rotatedCiphertext, err := c.Evaluator.RotateNew(res, 1*rot)
-			if err != nil {
-				panic(err)
-			}
-			// Add the rotated ciphertext back to the result
-			res, err = c.Evaluator.AddNew(res, rotatedCiphertext)
-			if err != nil {
-				panic(err)
-			}
-		}
-
-		// Decrypt the result back into plaintext
-		decryptedPlaintext := c.Decryptor.DecryptNew(res)
-
-		// Decode the decrypted result into a float64 slice
-		have := make([]float64, c.Params.MaxSlots())
-		if err = c.Encoder.Decode(decryptedPlaintext, have); err != nil {
-			panic(err)
-		}
-
-		// Append the computed distance to the result list
-		distances = append(distances, have[0])
+	// Rescale again after squaring to keep the ciphertext manageable
+	if err := evaluator.Rescale(squaredDiff, squaredDiff); err != nil {
+		panic(err)
 	}
 
-	// Return the distances to each target
-	return distances
+	// Send the result to the result channel (using squaredDiff as the final distance)
+	resultChannel <- Distance{
+		Distance: *squaredDiff, // You might want to send squaredDiff as the distance, not diff
+		Class:    classes[targetIdx],
+	}
+}
+
+// collectAndSortResults collects results from the result channel and sorts them by query index.
+func collectAndSortResults(resultChannel <-chan QueryResult) [][]Distance {
+	// Collect all results into a slice
+	var unsortedResults []QueryResult
+	for result := range resultChannel {
+		unsortedResults = append(unsortedResults, result)
+	}
+
+	// Sort the results by query index (QueryNum)
+	sort.Slice(unsortedResults, func(i, j int) bool {
+		return unsortedResults[i].QueryNum < unsortedResults[j].QueryNum
+	})
+
+	// Extract and return the sorted distances for each query
+	var sortedResults [][]Distance
+	for _, result := range unsortedResults {
+		sortedResults = append(sortedResults, result.Distances)
+	}
+	return sortedResults
+}
+
+func SerializeObject(obj interface{}) ([]byte, error) {
+	var buffer bytes.Buffer
+	encoder := gob.NewEncoder(&buffer)
+	err := encoder.Encode(obj)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to serialize object: %v", err)
+	}
+	return buffer.Bytes(), nil
+}
+
+
+// Function to deserialize the object
+func DeserializeObject(data []byte) (PublicContext, error) {
+	var obj PublicContext
+	decoder := gob.NewDecoder(bytes.NewReader(data))
+	err := decoder.Decode(&obj)
+	if err != nil {
+		panic(err)
+	}
+	return obj, nil
 }
