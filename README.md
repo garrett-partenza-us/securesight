@@ -4,26 +4,38 @@ A client-server system for face prediction using **Fully Homomorphic Encryption 
 
 ![Video Sample](assets/demo.gif)
 
-## Features 🌟
+## Features
 
 - **Client-Side (Go)**: Detect faces with **YOLO**, extract embeddings with **ResNet**, encrypt via **CKKS**, and send to the server.
 - **Server-Side (Go)**: Compute Euclidean distance in the encrypted space using **CKKS** and return predictions to the client.
 - **Concurrency**: Go routines for handling multiple faces and speeding things up.
 - **Multi-face**: Handles multiple faces per frame.
 - **Real-time**: Processes one frame every **1.7 seconds**.
-- **Encryption FTW**: Sensitive data stays encrypted the whole time. 🔐
-
-## How It Works 🛠️
-
-1. **Client** captures video, detects faces (YOLO), extracts embeddings (ResNet), and encrypts them with CKKS.
-2. **Server** receives encrypted data, calculates distances using encrypted KNN, and sends back encrypted class predictions.
-3. **Client** decrypts results and draws bounding boxes with predictions.
+- **Encryption FTW**: Sensitive data stays encrypted the whole time. 
 
 ## Prerequisites ⚡
 
 - Go 1.18+
 - [GoCV](https://github.com/hybridgroup/gocv)
 - [Lattigo](https://github.com/tuneinsight/lattigo) for CKKS FHE
-- ONNX models for YOLO and ResNet
+- ONNX runtime for YOLO and ResNet
 - Python (for KNN model training)
 
+## To Run
+**Train Model**
+```
+cd model
+python -m venv env
+pip install -r requirements.txt
+python train.py
+```
+**Client**
+```
+cd client
+go run *.go
+```
+**Server**
+```
+cd server
+go run *.go
+```
