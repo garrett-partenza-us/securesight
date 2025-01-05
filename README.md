@@ -1,4 +1,4 @@
-# Encrypted Facial Detection via Homomorphic Encryption in Golang
+# Encrypted Facial Recognition via Homomorphic Encryption in Golang
 
 A client-server system for face prediction using **Fully Homomorphic Encryption (FHE)** with the **CKKS scheme** and **K-Nearest Neighbors (KNN)** for classifying faces. The client handles the video, face detection, feature extraction, and encryption, while the server calculates distances and predicts classes in an encrypted space. 🔒
 
