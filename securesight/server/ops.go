@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"github.com/tuneinsight/lattigo/v6/core/rlwe"
 	"github.com/tuneinsight/lattigo/v6/schemes/ckks"
 )
@@ -50,7 +49,6 @@ func Setup() Context {
 	evk := rlwe.NewMemEvaluationKeySet(rlk)
 	evaluator := ckks.NewEvaluator(params, evk)
 	decryptor := rlwe.NewDecryptor(params, sk)
-	_ = pk
 
 	// Return the fully populated Context
 	return Context{
