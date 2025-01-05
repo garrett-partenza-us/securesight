@@ -59,6 +59,10 @@ func LoadKNN(path string) KNN {
 		class := record[len(record)-1]
 		classes = append(classes, class)
 	}
+
+	rows := len(matrix)
+	cols := len(matrix[0])
+	fmt.Printf("KNN model shape: %d x %d\n", rows, cols)
 	elapsedTime := time.Since(startTime)
 	fmt.Println("Total time loading model: ", elapsedTime.Milliseconds())
 

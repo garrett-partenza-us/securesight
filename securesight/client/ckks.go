@@ -95,24 +95,10 @@ func (c *Context) Encrypt(vec []float64) rlwe.Ciphertext {
 
 func (c *Context) NewPublicContext(query []rlwe.Ciphertext) PublicContext {
 
-	startTime := time.Now()
-
-	var keys []rlwe.MemEvaluationKeySet
-	for rot := 1; rot <= 4; rot++ {
-		galEls := []uint64{
-			c.Params.GaloisElement(1 * rot),
-			c.Params.GaloisElementForComplexConjugation(),
-		}
-		galoisKey := rlwe.NewMemEvaluationKeySet(&c.Rlk, c.Kgen.GenGaloisKeysNew(galEls, &c.Sk)...)
-		keys = append(keys, *galoisKey)
-	}
-	elapsedTime := time.Since(startTime)
-	fmt.Println("Time to create public CKKS context: ", elapsedTime.Milliseconds())
 	return PublicContext{
 		Params:     c.Params,
 		Rlk:        c.Rlk,
 		Evk:        c.Evk,
-		GaloisKeys: keys,
 		Query:      query,
 	}
 }
@@ -137,15 +123,13 @@ func (c *Context) Decrypt(res [][]Distance) ([][]float64, [][]string) {
 			if err := c.Encoder.Decode(decryptedPlaintext, have); err != nil {
 				panic(err)
 			}
-
-			distances = append(distances, sum(have[:4]))
+			distances = append(distances, sum(have[:512]))
 			classes = append(classes, target.Class)
 
 		}
 		results = append(results, distances)
 		resultsClasses = append(resultsClasses, classes)
 	}
-
 	elapsedTime := time.Since(startTime)
 	fmt.Println("Time to decrypt: ", elapsedTime.Milliseconds())
 	return results, resultsClasses

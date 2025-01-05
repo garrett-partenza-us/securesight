@@ -15,8 +15,7 @@ type PublicContext struct {
 	Params     ckks.Parameters            // CKKS parameters
 	Rlk        rlwe.RelinearizationKey    // Relinearization key for homomorphic multiplication
 	Evk        rlwe.MemEvaluationKeySet   // Memory-based evaluation keys for homomorphic operations
-	GaloisKeys []rlwe.MemEvaluationKeySet // Decryptor for decrypting ciphertexts
-	Query []rlwe.Ciphertext							  // List of encrypted query vectors
+	Query			 []rlwe.Ciphertext							  // List of encrypted query vectors
 }
 
 // Distance of KNN datapoint
@@ -30,107 +29,116 @@ type QueryResult struct {
 	QueryNum  int
 }
 
-func PredictEncrypted(k *KNN, c *PublicContext) [][]Distance {
+// PredictEncrypted calculates the Euclidean distance of encrypted queries in CKKS FHE for a KNN model
+// It performs the calculation concurrently for multiple queries and multiple KNN data points.
+func PredictEncrypted(knnModel *KNN, context *PublicContext) [][]Distance {
+	// Initialize evaluator from server-side context for FHE operations
+	evaluator := ckks.NewEvaluator(context.Params, &context.Evk)
 
-		// Initalize evaluator from server side context
-    evaluator := ckks.NewEvaluator(c.Params, &c.Evk)
+	// Channel for collecting results from goroutines
+	resultChannel := make(chan QueryResult, len(context.Query))
 
-    // Results for client of shape len(faces) x len(knn datapoints)
-    var results [][]Distance
+	// WaitGroup to manage concurrent execution of query processing
+	var wg sync.WaitGroup
 
-    // Create a channel to collect results from goroutines
-		multipleQueryDistances := make(chan struct {
-			Distances []Distance
-			QueryNum int
-		}, len(c.Query))
+	// Process each encrypted query concurrently
+	for queryIdx, ciphertext := range context.Query {
+		wg.Add(1)
+		go processQuery(ciphertext, queryIdx, knnModel, *evaluator, resultChannel, &wg)
+	}
 
-    // Iterate through each ciphertext (query) concurrently
-    var wg sync.WaitGroup
-    for qidx, ciphertext := range c.Query {
-        wg.Add(1)
-        go func(ciphertext rlwe.Ciphertext, qidx int) {
-            defer wg.Done()
+	// Wait for all query processing goroutines to finish
+	wg.Wait()
 
-            var result []Distance
-            resultChannelInner := make(chan Distance, len(k.Data)) // Channel for each target
-            var wgInner sync.WaitGroup
+	// Close the result channel after all queries are processed
+	close(resultChannel)
 
-            // Loop through each target in the KNN model to calculate distances
-            for j, target := range k.Data {
-                wgInner.Add(1)
-                go func(target []float64, idx int) {
-                    defer wgInner.Done()
+	// Collect the results and sort by query index
+	return collectAndSortResults(resultChannel)
+}
 
-                    // Compute the difference between the query and the target
-                    sum, err := evaluator.SubNew(&ciphertext, target)
-                    if err != nil {
-                        panic(err)
-                    }
+// processQuery calculates the Euclidean distance for a single query against all KNN data points.
+// It runs in a separate goroutine for each query.
+func processQuery(ciphertext rlwe.Ciphertext, queryIdx int, knnModel *KNN, evaluator ckks.Evaluator, resultChannel chan<- QueryResult, wg *sync.WaitGroup) {
+	defer wg.Done()
 
-                    // Square the difference (multiply it with itself)
-                    prod, err := evaluator.MulRelinNew(sum, sum)
-                    if err != nil {
-                        panic(err)
-                    }
+	// Channel for collecting distances of the current query from each target in the KNN model
+	innerResultChannel := make(chan Distance, len(knnModel.Data))
+	var innerWg sync.WaitGroup
 
-                    // Create a copy of the product to use 
-                    res := prod.CopyNew()
-										
-                    // Send the result for the current target to the inner channel
-										tuple := Distance{
-											Distance: *res,
-											Class: k.Classes[idx],
-										}
-                    resultChannelInner <- tuple
-                }(target, j)
-            }
+	// Process each target in the KNN model concurrently
+	for targetIdx, target := range knnModel.Data {
+		innerWg.Add(1)
+		go processTarget(ciphertext, target, targetIdx, knnModel.Classes, evaluator, innerResultChannel, &innerWg)
+	}
 
-            // Wait for all target goroutines to complete
-            wgInner.Wait()
+	// Wait for all target distance calculations to finish
+	innerWg.Wait()
 
-            // Close the inner channel after all target goroutines are done
-            close(resultChannelInner)
+	// Close the inner result channel after all targets have been processed
+	close(innerResultChannel)
 
-            // Collect the results from the inner channel for the current query
-            for distance := range resultChannelInner {
-                result = append(result, distance)
-            }
+	// Collect the distances for the current query
+	var distances []Distance
+	for dist := range innerResultChannel {
+		distances = append(distances, dist)
+	}
 
-            // Send the result for the current ciphertext (query) into the result channel
-						multipleQueryDistances <- struct {
-								Distances []Distance
-								QueryNum  int
-							}{
-								Distances: result,  // Assign result to the Distances field
-								QueryNum:  qidx,     // Assign qidx to the QueryNum field
-						}
-        }(ciphertext, qidx)
-    }
+	// Send the result for the current query into the main result channel
+	resultChannel <- QueryResult{
+		QueryNum:  queryIdx,
+		Distances: distances,
+	}
+}
 
-    // Wait for all query goroutines to complete
-    wg.Wait()
+// processTarget computes the squared Euclidean distance for a single target and a query.
+// It is executed concurrently for each target in the KNN model.
+func processTarget(ciphertext rlwe.Ciphertext, target []float64, targetIdx int, classes []string, evaluator ckks.Evaluator, resultChannel chan<- Distance, wg *sync.WaitGroup) {
+	defer wg.Done()
 
-    // Close the result channel after all queries are processed
-    close(multipleQueryDistances)
+	// Compute the difference between the query and the target
+	diff, err := evaluator.SubNew(&ciphertext, target)
+	if err != nil {
+		panic(err)
+	}
 
-		// Step 1: Receive all the struct data from the channel into a slice
-		var unsortedResults []QueryResult
-		for result := range multipleQueryDistances {
-			unsortedResults = append(unsortedResults, result)
-		}
+	// Square the difference (compute the squared Euclidean distance)
+	squaredDiff, err := evaluator.MulRelinNew(diff, diff)
+	if err != nil {
+		panic(err)
+	}
 
-		// Step 2: Sort the slice by QueryNum using sort.Slice
-		sort.Slice(unsortedResults, func(i, j int) bool {
-			return unsortedResults[i].QueryNum < unsortedResults[j].QueryNum
-		})
+	// Rescale again after squaring to keep the ciphertext manageable
+	if err := evaluator.Rescale(squaredDiff, squaredDiff); err != nil {
+		panic(err)
+	}
 
-		// Step 3: Print the sorted results
-		for _, result := range unsortedResults {
-			results = append(results, result.Distances)
-		}
+	// Send the result to the result channel (using squaredDiff as the final distance)
+	resultChannel <- Distance{
+		Distance: *squaredDiff, // You might want to send squaredDiff as the distance, not diff
+		Class:    classes[targetIdx],
+	}
+}
 
-    // Return the distances to each target
-    return results
+// collectAndSortResults collects results from the result channel and sorts them by query index.
+func collectAndSortResults(resultChannel <-chan QueryResult) [][]Distance {
+	// Collect all results into a slice
+	var unsortedResults []QueryResult
+	for result := range resultChannel {
+		unsortedResults = append(unsortedResults, result)
+	}
+
+	// Sort the results by query index (QueryNum)
+	sort.Slice(unsortedResults, func(i, j int) bool {
+		return unsortedResults[i].QueryNum < unsortedResults[j].QueryNum
+	})
+
+	// Extract and return the sorted distances for each query
+	var sortedResults [][]Distance
+	for _, result := range unsortedResults {
+		sortedResults = append(sortedResults, result.Distances)
+	}
+	return sortedResults
 }
 
 func SerializeObject(obj interface{}) ([]byte, error) {

@@ -53,7 +53,7 @@ def load_and_process_images(data_dir):
                         y.append(name)
                 except Exception as e:
                     logging.error(f"Failed for image: {path}", exc_info=True)
-
+    """
     pca = PCA(n_components=27)
     X = pca.fit_transform(X)
     joblib.dump(pca, './shared/weights/pca.joblib')
@@ -62,7 +62,7 @@ def load_and_process_images(data_dir):
     mean = pca.mean_.tolist()
     with open('./shared/weights/pca_components.json', 'w') as f:
         json.dump({'components': pca_components, 'mean': mean}, f)
-
+    """
     return np.array(X), np.array(y)
 
 

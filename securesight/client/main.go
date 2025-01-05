@@ -46,6 +46,7 @@ func main() {
 	encryptor := NewEncryptor()
 
 	pca := NewPCA("../shared/weights/pca_components.json")
+	_ = pca
 
 	for {
 
@@ -56,7 +57,7 @@ func main() {
 
 		boxes, _, indices := detector.Detect(&img)
 		embeddings := encoder.Encode(&img, boxes, indices)
-		embeddings = pca.Transform(embeddings)
+		// embeddings = pca.Transform(embeddings)
 		var ciphertexts []rlwe.Ciphertext
 		for idx := range embeddings {
 			ciphertext := encryptor.Encrypt(embeddings[idx])
@@ -114,8 +115,32 @@ func DistancesToClasses(d [][]float64, c [][]string) ([]string, error) {
 			return zipped[i][0].(float64) < zipped[j][0].(float64)
 		})
 
-		predictions = append(predictions, zipped[0][1].(string))
+
+		k := 5
+		var classes []string
+		for i := 0; i < k; i++ {
+			classes = append(classes, zipped[i][1].(string))
+		}
+		predictions = append(predictions, mostCommonClass(classes, k))
 	}
 
 	return predictions, nil
+}
+
+func mostCommonClass(classes []string, k int) string{
+	frequencyMap := make(map[string]int)
+
+	for _, class := range classes {
+		frequencyMap[class]++
+	}
+
+	var mostCommon string
+	maxCount := 0
+	for class, count := range frequencyMap {
+		if count > maxCount{
+			mostCommon = class
+			maxCount = count
+		}
+	}
+	return mostCommon
 }
