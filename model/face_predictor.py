@@ -9,7 +9,7 @@ class FacePredictor:
         model: The machine learning model loaded from a joblib file.
     """
 
-    def __init__(self, weights='./shared/weights/knn.joblib'):
+    def __init__(self, weights='../weights/knn.joblib'):
         """
         Initializes the FacePredictor with the given model weights.
 

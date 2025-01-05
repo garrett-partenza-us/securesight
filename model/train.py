@@ -6,11 +6,11 @@ import joblib
 import logging
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.decomposition import PCA
 from sklearn.preprocessing import LabelEncoder
+from sklearn.decomposition import PCA
 from sklearn.neighbors import KNeighborsClassifier
-from shared.face_detector import FaceDetector
-from shared.face_encoder import FaceEncoder
+from face_detector import FaceDetector
+from face_encoder import FaceEncoder
 
 # Configure logging
 logging.basicConfig(
@@ -19,7 +19,7 @@ logging.basicConfig(
     datefmt='%Y-%m-%d %H:%M:%S'
 )
 
-DATA_DIR = "./model/data/images"  # Training data
+DATA_DIR = "data"  # Training data
 
 
 def load_and_process_images(data_dir):
@@ -53,20 +53,10 @@ def load_and_process_images(data_dir):
                         y.append(name)
                 except Exception as e:
                     logging.error(f"Failed for image: {path}", exc_info=True)
-    """
-    pca = PCA(n_components=27)
-    X = pca.fit_transform(X)
-    joblib.dump(pca, './shared/weights/pca.joblib')
-    # Save the principal components and mean as separate JSON file
-    pca_components = pca.components_.tolist()
-    mean = pca.mean_.tolist()
-    with open('./shared/weights/pca_components.json', 'w') as f:
-        json.dump({'components': pca_components, 'mean': mean}, f)
-    """
     return np.array(X), np.array(y)
 
 
-def train_knn_classifier(X, y, model_path="./shared/weights/knn.joblib"):
+def train_knn_classifier(X, y, model_path="../weights/knn.joblib"):
     """
     Trains a K-Nearest Neighbors (KNN) classifier and saves the model.
 
@@ -81,7 +71,7 @@ def train_knn_classifier(X, y, model_path="./shared/weights/knn.joblib"):
     logging.info(f"KNN model saved to {model_path}")
 
 
-def visualize_embeddings_with_pca(X, y, output_path="./model/plots/PCA.png"):
+def visualize_embeddings_with_pca(X, y, output_path="./plots/PCA.png"):
     """
     Visualizes embeddings using PCA and saves the scatter plot.
 
@@ -113,7 +103,7 @@ def main():
     """
     X, y = load_and_process_images(DATA_DIR)
     print(X.shape, y.shape)
-    np.savetxt("./shared/weights/knn.csv", np.append(X.astype(str), y.reshape(-1, 1), axis=1),
+    np.savetxt("../weights/knn.csv", np.append(X.astype(str), y.reshape(-1, 1), axis=1),
                delimiter=",", fmt="%s")
     train_knn_classifier(X, y)
     visualize_embeddings_with_pca(X, y)
