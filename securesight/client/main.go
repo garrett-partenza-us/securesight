@@ -72,7 +72,7 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		distances, classes := encryptor.Decrypt(responseData.Distances)
+		distances, classes := encryptor.Decrypt(responseData.Distances, responseData.Params)
 		predictions, err := DistancesToClasses(distances, classes)
 
 		DrawBoxes(&img, predictions, boxes, indices)

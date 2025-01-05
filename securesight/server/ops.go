@@ -31,7 +31,7 @@ type QueryResult struct {
 
 // PredictEncrypted calculates the Euclidean distance of encrypted queries in CKKS FHE for a KNN model
 // It performs the calculation concurrently for multiple queries and multiple KNN data points.
-func PredictEncrypted(knnModel *KNN, context *PublicContext) [][]Distance {
+func PredictEncrypted(knnModel *KNN, context *PublicContext) ([][]Distance, ckks.Parameters) {
 	// Initialize evaluator from server-side context for FHE operations
 	evaluator := ckks.NewEvaluator(context.Params, &context.Evk)
 
@@ -44,7 +44,7 @@ func PredictEncrypted(knnModel *KNN, context *PublicContext) [][]Distance {
 	// Process each encrypted query concurrently
 	for queryIdx, ciphertext := range context.Query {
 		wg.Add(1)
-		go processQuery(ciphertext, queryIdx, knnModel, *evaluator, resultChannel, &wg)
+		go processQuery(ciphertext, queryIdx, knnModel, *evaluator.ShallowCopy(), resultChannel, &wg)
 	}
 
 	// Wait for all query processing goroutines to finish
@@ -54,7 +54,7 @@ func PredictEncrypted(knnModel *KNN, context *PublicContext) [][]Distance {
 	close(resultChannel)
 
 	// Collect the results and sort by query index
-	return collectAndSortResults(resultChannel)
+	return collectAndSortResults(resultChannel), context.Params
 }
 
 // processQuery calculates the Euclidean distance for a single query against all KNN data points.
@@ -69,7 +69,7 @@ func processQuery(ciphertext rlwe.Ciphertext, queryIdx int, knnModel *KNN, evalu
 	// Process each target in the KNN model concurrently
 	for targetIdx, target := range knnModel.Data {
 		innerWg.Add(1)
-		go processTarget(ciphertext, target, targetIdx, knnModel.Classes, evaluator, innerResultChannel, &innerWg)
+		go processTarget(ciphertext, target, targetIdx, knnModel.Classes, *evaluator.ShallowCopy(), innerResultChannel, &innerWg)
 	}
 
 	// Wait for all target distance calculations to finish
@@ -107,6 +107,7 @@ func processTarget(ciphertext rlwe.Ciphertext, target []float64, targetIdx int, 
 	if err != nil {
 		panic(err)
 	}
+
 
 	// Rescale again after squaring to keep the ciphertext manageable
 	if err := evaluator.Rescale(squaredDiff, squaredDiff); err != nil {

@@ -5,6 +5,7 @@ import (
 	"encoding/gob"
 	"fmt"
 	"github.com/tuneinsight/lattigo/v6/core/rlwe"
+	"github.com/tuneinsight/lattigo/v6/schemes/ckks"
 	"io/ioutil"
 	"net/http"
 	"time"
@@ -13,6 +14,7 @@ import (
 type ResponseData struct {
 	Distances [][]Distance `json:"Distances"`
 	Classes   []string            `json:"Classes"`
+	Params   ckks.Parameters    `json:"Params"`
 }
 
 type Distance struct{

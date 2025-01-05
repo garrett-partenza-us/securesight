@@ -10,7 +10,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
-	//"github.com/tuneinsight/lattigo/v6/core/rlwe"
+	"github.com/tuneinsight/lattigo/v6/schemes/ckks"
 )
 
 var model KNN
@@ -19,6 +19,7 @@ var context PublicContext
 type Response struct {
 	Distances [][]Distance `json:"Distances"`
 	Classes   []string    `json:"Classes"`
+	Params   ckks.Parameters    `json:"Params"`
 }
 
 type KNN struct {
@@ -111,12 +112,13 @@ func knnHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 
-	res := PredictEncrypted(&model, &context)
+	res, params := PredictEncrypted(&model, &context)
 
 
 	response := Response{
 		Distances: res,
 		Classes:   model.Classes,
+		Params: params,
 	}
 
 	// Serialize the response struct

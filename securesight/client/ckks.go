@@ -103,7 +103,7 @@ func (c *Context) NewPublicContext(query []rlwe.Ciphertext) PublicContext {
 	}
 }
 
-func (c *Context) Decrypt(res [][]Distance) ([][]float64, [][]string) {
+func (c *Context) Decrypt(res [][]Distance, params ckks.Parameters) ([][]float64, [][]string) {
 
 	startTime := time.Now()
 
