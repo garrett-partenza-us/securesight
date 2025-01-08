@@ -73,9 +73,21 @@ func NewEncryptor() Context {
 	}
 }
 
+func repeatVector(vec []float64, n int) []float64 {
+	result := make([]float64, 0, len(vec)*n)
+	for i:=0;i<n;i++{
+		result = append(result, vec...)
+	}
+	return result
+}
+
 func (c *Context) Encrypt(vec []float64) rlwe.Ciphertext {
 
 	startTime := time.Now()
+
+	maxRepeat := int(c.Params.MaxSlots()) / 512
+	vec = repeatVector(vec, maxRepeat)
+
 
 	plaintext := ckks.NewPlaintext(c.Params, c.Params.MaxLevel())
 	if err := c.Encoder.Encode(vec, plaintext); err != nil {
@@ -123,9 +135,11 @@ func (c *Context) Decrypt(res [][]Distance, params ckks.Parameters) ([][]float64
 			if err := c.Encoder.Decode(decryptedPlaintext, have); err != nil {
 				panic(err)
 			}
-			distances = append(distances, sum(have[:512]))
-			classes = append(classes, target.Class)
 
+			for x:=0; x<len(target.Classes); x++ {
+				distances = append(distances, sum(have[x*512:x*512+512]))
+				classes = append(classes, target.Classes[x])
+			}
 		}
 		results = append(results, distances)
 		resultsClasses = append(resultsClasses, classes)
