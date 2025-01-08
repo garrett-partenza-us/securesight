@@ -31,6 +31,7 @@ type PublicContext struct {
 	Query      []rlwe.Ciphertext
 }
 
+// Generate a new client-side encryption context
 func NewEncryptor() Context {
 	startTime := time.Now()
 	// Initialize CKKS parameters
@@ -73,14 +74,7 @@ func NewEncryptor() Context {
 	}
 }
 
-func repeatVector(vec []float64, n int) []float64 {
-	result := make([]float64, 0, len(vec)*n)
-	for i:=0;i<n;i++{
-		result = append(result, vec...)
-	}
-	return result
-}
-
+// Encrypt facial embeddings
 func (c *Context) Encrypt(vec []float64) rlwe.Ciphertext {
 
 	startTime := time.Now()
@@ -105,6 +99,7 @@ func (c *Context) Encrypt(vec []float64) rlwe.Ciphertext {
 	return *ciphertext
 }
 
+// Generate new public context for server
 func (c *Context) NewPublicContext(query []rlwe.Ciphertext) PublicContext {
 
 	return PublicContext{
@@ -115,6 +110,7 @@ func (c *Context) NewPublicContext(query []rlwe.Ciphertext) PublicContext {
 	}
 }
 
+// Decrypt and unpack distances for each detected face
 func (c *Context) Decrypt(res [][]Distance, params ckks.Parameters) ([][]float64, [][]string) {
 
 	startTime := time.Now()
@@ -156,4 +152,12 @@ func sum(arr []float64) float64 {
 		total+=num
 	}
 	return total
+}
+
+func repeatVector(vec []float64, n int) []float64 {
+	result := make([]float64, 0, len(vec)*n)
+	for i:=0;i<n;i++{
+		result = append(result, vec...)
+	}
+	return result
 }

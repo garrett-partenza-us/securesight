@@ -18,10 +18,10 @@ type ResponseData struct {
 	Params    ckks.Parameters `json:"Params"`
 }
 
-// Distance of KNN datapoint
+// Euclidean distance of packed targets
 type Distance struct{
-	Distance rlwe.Ciphertext							// Distance from a given target example
-	Classes []string													// Class of the given target example
+	Distance rlwe.Ciphertext									// Distances from a given target example
+	Classes []string													// Classes of the given target example (packed)
 }
 
 type QueryResult struct {
