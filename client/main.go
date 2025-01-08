@@ -2,19 +2,19 @@ package main
 
 import (
 	"fmt"
-	"strings"
 	"github.com/tuneinsight/lattigo/v6/core/rlwe"
 	"gocv.io/x/gocv"
 	"image"
 	"image/color"
 	"sort"
+	"strings"
 	"time"
 )
 
 func main() {
 
 	// Print a start message with a visual separator
-	fmt.Println(strings.Repeat("-", 20)+"\nStarting client...\n"+strings.Repeat("-", 20))
+	fmt.Println(strings.Repeat("-", 20) + "\nStarting client...\n" + strings.Repeat("-", 20))
 
 	// Open the video file for processing
 	videoFile := "../video.mp4"
@@ -57,7 +57,7 @@ func main() {
 	// Start processing video frames
 	for {
 		// Print message for processing current frame
-		fmt.Println(strings.Repeat("-", 20)+"\nProcessing frame...\n"+strings.Repeat("-", 20))
+		fmt.Println(strings.Repeat("-", 20) + "\nProcessing frame...\n" + strings.Repeat("-", 20))
 
 		// Read the next frame from the webcam
 		webcam.Read(&img)
@@ -118,7 +118,7 @@ func main() {
 // DrawBoxes overlays bounding boxes and predicted class labels on the image.
 func DrawBoxes(img *gocv.Mat, predictions []string, boxes []image.Rectangle, indices []int) {
 	for i := 0; i < len(indices); i++ {
-		rect := boxes[indices[i]] // Get the bounding box for the current detection
+		rect := boxes[indices[i]]                              // Get the bounding box for the current detection
 		gocv.Rectangle(img, rect, color.RGBA{0, 255, 0, 0}, 3) // Draw the rectangle (green)
 
 		// Calculate the center of the bounding box to position the text
@@ -188,4 +188,3 @@ func mostCommonClass(classes []string, k int) string {
 	}
 	return mostCommon
 }
-

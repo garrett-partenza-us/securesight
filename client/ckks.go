@@ -2,9 +2,9 @@ package main
 
 import (
 	"fmt"
-	"time"
 	"github.com/tuneinsight/lattigo/v6/core/rlwe"
 	"github.com/tuneinsight/lattigo/v6/schemes/ckks"
+	"time"
 )
 
 // Context holds the cryptographic parameters, key management, encryption, decryption,
@@ -31,6 +31,7 @@ type PublicContext struct {
 	Query      []rlwe.Ciphertext
 }
 
+// Generate a new client-side encryption context
 func NewEncryptor() Context {
 	startTime := time.Now()
 	// Initialize CKKS parameters
@@ -73,21 +74,13 @@ func NewEncryptor() Context {
 	}
 }
 
-func repeatVector(vec []float64, n int) []float64 {
-	result := make([]float64, 0, len(vec)*n)
-	for i:=0;i<n;i++{
-		result = append(result, vec...)
-	}
-	return result
-}
-
+// Encrypt facial embeddings
 func (c *Context) Encrypt(vec []float64) rlwe.Ciphertext {
 
 	startTime := time.Now()
 
 	maxRepeat := int(c.Params.MaxSlots()) / 512
 	vec = repeatVector(vec, maxRepeat)
-
 
 	plaintext := ckks.NewPlaintext(c.Params, c.Params.MaxLevel())
 	if err := c.Encoder.Encode(vec, plaintext); err != nil {
@@ -105,16 +98,18 @@ func (c *Context) Encrypt(vec []float64) rlwe.Ciphertext {
 	return *ciphertext
 }
 
+// Generate new public context for server
 func (c *Context) NewPublicContext(query []rlwe.Ciphertext) PublicContext {
 
 	return PublicContext{
-		Params:     c.Params,
-		Rlk:        c.Rlk,
-		Evk:        c.Evk,
-		Query:      query,
+		Params: c.Params,
+		Rlk:    c.Rlk,
+		Evk:    c.Evk,
+		Query:  query,
 	}
 }
 
+// Decrypt and unpack distances for each detected face
 func (c *Context) Decrypt(res [][]Distance, params ckks.Parameters) ([][]float64, [][]string) {
 
 	startTime := time.Now()
@@ -136,7 +131,7 @@ func (c *Context) Decrypt(res [][]Distance, params ckks.Parameters) ([][]float64
 				panic(err)
 			}
 
-			for x:=0; x<len(target.Classes); x++ {
+			for x := 0; x < len(target.Classes); x++ {
 				distances = append(distances, sum(have[x*512:x*512+512]))
 				classes = append(classes, target.Classes[x])
 			}
@@ -153,7 +148,15 @@ func (c *Context) Decrypt(res [][]Distance, params ckks.Parameters) ([][]float64
 func sum(arr []float64) float64 {
 	var total float64
 	for _, num := range arr {
-		total+=num
+		total += num
 	}
 	return total
+}
+
+func repeatVector(vec []float64, n int) []float64 {
+	result := make([]float64, 0, len(vec)*n)
+	for i := 0; i < n; i++ {
+		result = append(result, vec...)
+	}
+	return result
 }

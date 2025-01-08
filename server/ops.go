@@ -1,32 +1,37 @@
 package main
 
 import (
-	"fmt"
-	"sync"
 	"bytes"
 	"encoding/gob"
-	"sort"
+	"fmt"
 	"github.com/tuneinsight/lattigo/v6/core/rlwe"
 	"github.com/tuneinsight/lattigo/v6/schemes/ckks"
+	"sort"
+	"sync"
 )
 
 // Server side CKKS context
 type PublicContext struct {
-	Params     ckks.Parameters            // CKKS parameters
-	Rlk        rlwe.RelinearizationKey    // Relinearization key for homomorphic multiplication
-	Evk        rlwe.MemEvaluationKeySet   // Memory-based evaluation keys for homomorphic operations
-	Query			 []rlwe.Ciphertext							  // List of encrypted query vectors
+	Params ckks.Parameters          // CKKS parameters
+	Rlk    rlwe.RelinearizationKey  // Relinearization key for homomorphic multiplication
+	Evk    rlwe.MemEvaluationKeySet // Memory-based evaluation keys for homomorphic operations
+	Query  []rlwe.Ciphertext        // List of encrypted query vectors
 }
 
 // Distance of KNN datapoint
-type Distance struct{
-	Distance rlwe.Ciphertext							// Distance from a given target example
-	Classes []string													// Class of the given target example
+type Distance struct {
+	Distance rlwe.Ciphertext // Distance from a given target example
+	Classes  []string        // Class of the given target example
 }
 
 type QueryResult struct {
 	Distances []Distance
 	QueryNum  int
+}
+
+type PackedTarget struct {
+	Vec     []float64
+	Classes []string
 }
 
 // PredictEncrypted calculates the Euclidean distance of encrypted queries in CKKS FHE for a KNN model
@@ -95,45 +100,6 @@ func processQuery(ciphertext rlwe.Ciphertext, queryIdx int, packs []PackedTarget
 	}
 }
 
-func batchTargets(targets [][]float64, n int) [][][]float64 {
-	var batches [][][]float64
-	for i:= 0; i < len(targets); i+=n{
-		end := i+n
-		if end > len(targets){
-			end = len(targets)
-		}
-
-		batch := targets[i:end]
-		batches = append(batches, batch)
-	}
-	return batches
-}
-
-type PackedTarget struct {
-	Vec			[]float64
-	Classes []string
-}
-
-func packTargets(batches [][][]float64, classes []string) []PackedTarget {
-	var packs []PackedTarget
-	targetIdx := 0
-	for _, batch := range batches {
-		var concatenated []float64
-		var packClasses []string
-		for _, vec := range batch {
-			concatenated = append(concatenated, vec...)
-			packClasses = append(packClasses, classes[targetIdx])
-			targetIdx++
-		}
-		packedTarget := PackedTarget{
-			Vec: concatenated,
-			Classes: packClasses,
-		}
-		packs = append(packs, packedTarget)
-	}
-	return packs
-}
-
 // processTarget computes the squared Euclidean distance for a single target and a query.
 // It is executed concurrently for each target in the KNN model.
 func processTarget(ciphertext rlwe.Ciphertext, pack PackedTarget, evaluator ckks.Evaluator, resultChannel chan<- Distance, wg *sync.WaitGroup) {
@@ -151,7 +117,6 @@ func processTarget(ciphertext rlwe.Ciphertext, pack PackedTarget, evaluator ckks
 	if err != nil {
 		panic(err)
 	}
-
 
 	// Rescale again after squaring to keep the ciphertext manageable
 	if err := evaluator.Rescale(squaredDiff, squaredDiff); err != nil {
@@ -196,7 +161,6 @@ func SerializeObject(obj interface{}) ([]byte, error) {
 	return buffer.Bytes(), nil
 }
 
-
 // Function to deserialize the object
 func DeserializeObject(data []byte) (PublicContext, error) {
 	var obj PublicContext
@@ -206,4 +170,38 @@ func DeserializeObject(data []byte) (PublicContext, error) {
 		panic(err)
 	}
 	return obj, nil
+}
+
+func batchTargets(targets [][]float64, n int) [][][]float64 {
+	var batches [][][]float64
+	for i := 0; i < len(targets); i += n {
+		end := i + n
+		if end > len(targets) {
+			end = len(targets)
+		}
+
+		batch := targets[i:end]
+		batches = append(batches, batch)
+	}
+	return batches
+}
+
+func packTargets(batches [][][]float64, classes []string) []PackedTarget {
+	var packs []PackedTarget
+	targetIdx := 0
+	for _, batch := range batches {
+		var concatenated []float64
+		var packClasses []string
+		for _, vec := range batch {
+			concatenated = append(concatenated, vec...)
+			packClasses = append(packClasses, classes[targetIdx])
+			targetIdx++
+		}
+		packedTarget := PackedTarget{
+			Vec:     concatenated,
+			Classes: packClasses,
+		}
+		packs = append(packs, packedTarget)
+	}
+	return packs
 }
