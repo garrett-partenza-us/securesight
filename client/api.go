@@ -18,10 +18,15 @@ type ResponseData struct {
 	Params    ckks.Parameters `json:"Params"`
 }
 
-// Distance represents a distance measurement and its corresponding class.
-type Distance struct {
-	Distance rlwe.Ciphertext // Encrypted distance value
-	Class    string           // Class label associated with the distance
+// Distance of KNN datapoint
+type Distance struct{
+	Distance rlwe.Ciphertext							// Distance from a given target example
+	Classes []string													// Class of the given target example
+}
+
+type QueryResult struct {
+	Distances []Distance
+	QueryNum  int
 }
 
 // CallAPI sends a POST request with the serialized data to the KNN API, 

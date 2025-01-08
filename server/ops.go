@@ -21,7 +21,7 @@ type PublicContext struct {
 // Distance of KNN datapoint
 type Distance struct{
 	Distance rlwe.Ciphertext							// Distance from a given target example
-	Class string													// Class of the given target example
+	Classes []string													// Class of the given target example
 }
 
 type QueryResult struct {
@@ -38,13 +38,17 @@ func PredictEncrypted(knnModel *KNN, context *PublicContext) ([][]Distance, ckks
 	// Channel for collecting results from goroutines
 	resultChannel := make(chan QueryResult, len(context.Query))
 
+	maxRepeat := int(context.Params.MaxSlots()) / 512
+	batches := batchTargets(knnModel.Data, maxRepeat)
+	packs := packTargets(batches, knnModel.Classes)
+
 	// WaitGroup to manage concurrent execution of query processing
 	var wg sync.WaitGroup
 
 	// Process each encrypted query concurrently
 	for queryIdx, ciphertext := range context.Query {
 		wg.Add(1)
-		go processQuery(ciphertext, queryIdx, knnModel, *evaluator.ShallowCopy(), resultChannel, &wg)
+		go processQuery(ciphertext, queryIdx, packs, *evaluator.ShallowCopy(), resultChannel, &wg)
 	}
 
 	// Wait for all query processing goroutines to finish
@@ -59,17 +63,17 @@ func PredictEncrypted(knnModel *KNN, context *PublicContext) ([][]Distance, ckks
 
 // processQuery calculates the Euclidean distance for a single query against all KNN data points.
 // It runs in a separate goroutine for each query.
-func processQuery(ciphertext rlwe.Ciphertext, queryIdx int, knnModel *KNN, evaluator ckks.Evaluator, resultChannel chan<- QueryResult, wg *sync.WaitGroup) {
+func processQuery(ciphertext rlwe.Ciphertext, queryIdx int, packs []PackedTarget, evaluator ckks.Evaluator, resultChannel chan<- QueryResult, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	// Channel for collecting distances of the current query from each target in the KNN model
-	innerResultChannel := make(chan Distance, len(knnModel.Data))
+	innerResultChannel := make(chan Distance, len(packs))
 	var innerWg sync.WaitGroup
 
 	// Process each target in the KNN model concurrently
-	for targetIdx, target := range knnModel.Data {
+	for _, pack := range packs {
 		innerWg.Add(1)
-		go processTarget(ciphertext, target, targetIdx, knnModel.Classes, *evaluator.ShallowCopy(), innerResultChannel, &innerWg)
+		go processTarget(ciphertext, pack, *evaluator.ShallowCopy(), innerResultChannel, &innerWg)
 	}
 
 	// Wait for all target distance calculations to finish
@@ -91,13 +95,53 @@ func processQuery(ciphertext rlwe.Ciphertext, queryIdx int, knnModel *KNN, evalu
 	}
 }
 
+func batchTargets(targets [][]float64, n int) [][][]float64 {
+	var batches [][][]float64
+	for i:= 0; i < len(targets); i+=n{
+		end := i+n
+		if end > len(targets){
+			end = len(targets)
+		}
+
+		batch := targets[i:end]
+		batches = append(batches, batch)
+	}
+	return batches
+}
+
+type PackedTarget struct {
+	Vec			[]float64
+	Classes []string
+}
+
+func packTargets(batches [][][]float64, classes []string) []PackedTarget {
+	var packs []PackedTarget
+	targetIdx := 0
+	for _, batch := range batches {
+		var concatenated []float64
+		var packClasses []string
+		for _, vec := range batch {
+			concatenated = append(concatenated, vec...)
+			packClasses = append(packClasses, classes[targetIdx])
+			targetIdx++
+		}
+		packedTarget := PackedTarget{
+			Vec: concatenated,
+			Classes: packClasses,
+		}
+		packs = append(packs, packedTarget)
+	}
+	return packs
+}
+
 // processTarget computes the squared Euclidean distance for a single target and a query.
 // It is executed concurrently for each target in the KNN model.
-func processTarget(ciphertext rlwe.Ciphertext, target []float64, targetIdx int, classes []string, evaluator ckks.Evaluator, resultChannel chan<- Distance, wg *sync.WaitGroup) {
+func processTarget(ciphertext rlwe.Ciphertext, pack PackedTarget, evaluator ckks.Evaluator, resultChannel chan<- Distance, wg *sync.WaitGroup) {
+
 	defer wg.Done()
 
 	// Compute the difference between the query and the target
-	diff, err := evaluator.SubNew(&ciphertext, target)
+	diff, err := evaluator.SubNew(&ciphertext, pack.Vec)
 	if err != nil {
 		panic(err)
 	}
@@ -117,7 +161,7 @@ func processTarget(ciphertext rlwe.Ciphertext, target []float64, targetIdx int, 
 	// Send the result to the result channel (using squaredDiff as the final distance)
 	resultChannel <- Distance{
 		Distance: *squaredDiff, // You might want to send squaredDiff as the distance, not diff
-		Class:    classes[targetIdx],
+		Classes:  pack.Classes,
 	}
 }
 
