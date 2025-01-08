@@ -1,27 +1,27 @@
 package main
 
 import (
-	"fmt"
-	"sync"
 	"bytes"
 	"encoding/gob"
-	"sort"
+	"fmt"
 	"github.com/tuneinsight/lattigo/v6/core/rlwe"
 	"github.com/tuneinsight/lattigo/v6/schemes/ckks"
+	"sort"
+	"sync"
 )
 
 // Server side CKKS context
 type PublicContext struct {
-	Params     ckks.Parameters            // CKKS parameters
-	Rlk        rlwe.RelinearizationKey    // Relinearization key for homomorphic multiplication
-	Evk        rlwe.MemEvaluationKeySet   // Memory-based evaluation keys for homomorphic operations
-	Query			 []rlwe.Ciphertext							  // List of encrypted query vectors
+	Params ckks.Parameters          // CKKS parameters
+	Rlk    rlwe.RelinearizationKey  // Relinearization key for homomorphic multiplication
+	Evk    rlwe.MemEvaluationKeySet // Memory-based evaluation keys for homomorphic operations
+	Query  []rlwe.Ciphertext        // List of encrypted query vectors
 }
 
 // Distance of KNN datapoint
-type Distance struct{
-	Distance rlwe.Ciphertext							// Distance from a given target example
-	Classes []string													// Class of the given target example
+type Distance struct {
+	Distance rlwe.Ciphertext // Distance from a given target example
+	Classes  []string        // Class of the given target example
 }
 
 type QueryResult struct {
@@ -30,7 +30,7 @@ type QueryResult struct {
 }
 
 type PackedTarget struct {
-	Vec			[]float64
+	Vec     []float64
 	Classes []string
 }
 
@@ -118,7 +118,6 @@ func processTarget(ciphertext rlwe.Ciphertext, pack PackedTarget, evaluator ckks
 		panic(err)
 	}
 
-
 	// Rescale again after squaring to keep the ciphertext manageable
 	if err := evaluator.Rescale(squaredDiff, squaredDiff); err != nil {
 		panic(err)
@@ -162,7 +161,6 @@ func SerializeObject(obj interface{}) ([]byte, error) {
 	return buffer.Bytes(), nil
 }
 
-
 // Function to deserialize the object
 func DeserializeObject(data []byte) (PublicContext, error) {
 	var obj PublicContext
@@ -176,9 +174,9 @@ func DeserializeObject(data []byte) (PublicContext, error) {
 
 func batchTargets(targets [][]float64, n int) [][][]float64 {
 	var batches [][][]float64
-	for i:= 0; i < len(targets); i+=n{
-		end := i+n
-		if end > len(targets){
+	for i := 0; i < len(targets); i += n {
+		end := i + n
+		if end > len(targets) {
 			end = len(targets)
 		}
 
@@ -200,7 +198,7 @@ func packTargets(batches [][][]float64, classes []string) []PackedTarget {
 			targetIdx++
 		}
 		packedTarget := PackedTarget{
-			Vec: concatenated,
+			Vec:     concatenated,
 			Classes: packClasses,
 		}
 		packs = append(packs, packedTarget)

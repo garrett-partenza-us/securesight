@@ -1,27 +1,27 @@
 package main
 
 import (
-	"time"
-	"strings"
-	"io/ioutil"
 	"encoding/csv"
 	"fmt"
+	"github.com/tuneinsight/lattigo/v6/schemes/ckks"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 	"strconv"
-	"github.com/tuneinsight/lattigo/v6/schemes/ckks"
+	"strings"
+	"time"
 )
 
 // Global variables
-var model KNN           // KNN model containing training data and associated classes
+var model KNN             // KNN model containing training data and associated classes
 var context PublicContext // PublicContext for managing the encryption context
 
 // Response struct to define the format of the API response
 type Response struct {
-	Distances [][]Distance `json:"Distances"` // Distance matrix for KNN predictions
-	Classes   []string    `json:"Classes"`   // List of classes for KNN predictions
-	Params    ckks.Parameters `json:"Params"`  // Parameters required for decryption
+	Distances [][]Distance    `json:"Distances"` // Distance matrix for KNN predictions
+	Classes   []string        `json:"Classes"`   // List of classes for KNN predictions
+	Params    ckks.Parameters `json:"Params"`    // Parameters required for decryption
 }
 
 // KNN struct to represent the K-Nearest Neighbors model
@@ -133,9 +133,9 @@ func knnHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Prepare the response with distances, classes, and decryption parameters
 	response := Response{
-		Distances: res,  // Predicted distances for KNN
+		Distances: res,           // Predicted distances for KNN
 		Classes:   model.Classes, // Classes from the KNN model
-		Params:    params, // Parameters needed to decrypt the result
+		Params:    params,        // Parameters needed to decrypt the result
 	}
 
 	// Serialize the response object into bytes

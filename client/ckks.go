@@ -2,9 +2,9 @@ package main
 
 import (
 	"fmt"
-	"time"
 	"github.com/tuneinsight/lattigo/v6/core/rlwe"
 	"github.com/tuneinsight/lattigo/v6/schemes/ckks"
+	"time"
 )
 
 // Context holds the cryptographic parameters, key management, encryption, decryption,
@@ -82,7 +82,6 @@ func (c *Context) Encrypt(vec []float64) rlwe.Ciphertext {
 	maxRepeat := int(c.Params.MaxSlots()) / 512
 	vec = repeatVector(vec, maxRepeat)
 
-
 	plaintext := ckks.NewPlaintext(c.Params, c.Params.MaxLevel())
 	if err := c.Encoder.Encode(vec, plaintext); err != nil {
 		panic(err)
@@ -103,10 +102,10 @@ func (c *Context) Encrypt(vec []float64) rlwe.Ciphertext {
 func (c *Context) NewPublicContext(query []rlwe.Ciphertext) PublicContext {
 
 	return PublicContext{
-		Params:     c.Params,
-		Rlk:        c.Rlk,
-		Evk:        c.Evk,
-		Query:      query,
+		Params: c.Params,
+		Rlk:    c.Rlk,
+		Evk:    c.Evk,
+		Query:  query,
 	}
 }
 
@@ -132,7 +131,7 @@ func (c *Context) Decrypt(res [][]Distance, params ckks.Parameters) ([][]float64
 				panic(err)
 			}
 
-			for x:=0; x<len(target.Classes); x++ {
+			for x := 0; x < len(target.Classes); x++ {
 				distances = append(distances, sum(have[x*512:x*512+512]))
 				classes = append(classes, target.Classes[x])
 			}
@@ -149,14 +148,14 @@ func (c *Context) Decrypt(res [][]Distance, params ckks.Parameters) ([][]float64
 func sum(arr []float64) float64 {
 	var total float64
 	for _, num := range arr {
-		total+=num
+		total += num
 	}
 	return total
 }
 
 func repeatVector(vec []float64, n int) []float64 {
 	result := make([]float64, 0, len(vec)*n)
-	for i:=0;i<n;i++{
+	for i := 0; i < n; i++ {
 		result = append(result, vec...)
 	}
 	return result

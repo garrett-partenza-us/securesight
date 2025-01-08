@@ -94,4 +94,3 @@ func FormatResultsYOLO(m *gocv.Mat, scale float32) ([]image.Rectangle, []float32
 
 	return boxes, scores, indices
 }
-

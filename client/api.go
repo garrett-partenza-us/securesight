@@ -13,15 +13,15 @@ import (
 
 // ResponseData represents the structure of the response from the KNN API.
 type ResponseData struct {
-	Distances [][]Distance `json:"Distances"`
-	Classes   []string     `json:"Classes"`
+	Distances [][]Distance    `json:"Distances"`
+	Classes   []string        `json:"Classes"`
 	Params    ckks.Parameters `json:"Params"`
 }
 
 // Euclidean distance of packed targets
-type Distance struct{
-	Distance rlwe.Ciphertext									// Distances from a given target example
-	Classes []string													// Classes of the given target example (packed)
+type Distance struct {
+	Distance rlwe.Ciphertext // Distances from a given target example
+	Classes  []string        // Classes of the given target example (packed)
 }
 
 type QueryResult struct {
@@ -29,12 +29,12 @@ type QueryResult struct {
 	QueryNum  int
 }
 
-// CallAPI sends a POST request with the serialized data to the KNN API, 
+// CallAPI sends a POST request with the serialized data to the KNN API,
 // deserializes the response, and returns it as ResponseData.
 func CallAPI(serializedData []byte) (ResponseData, error) {
 	// API endpoint for KNN service
 	url := "http://localhost:8080/api/knn"
-	
+
 	// Send POST request with serialized data as the payload
 	resp, err := http.Post(url, "application/octet-stream", bytes.NewReader(serializedData))
 	if err != nil {
@@ -72,7 +72,7 @@ func SerializeObject(obj interface{}) ([]byte, error) {
 	// Log time taken for serialization
 	elapsedTime := time.Since(startTime)
 	fmt.Println("Time to serialize ciphertexts: ", elapsedTime)
-	
+
 	return buffer.Bytes(), nil
 }
 
@@ -94,4 +94,3 @@ func DeserializeObject(data []byte) (ResponseData, error) {
 
 	return obj, nil
 }
-

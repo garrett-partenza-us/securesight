@@ -25,7 +25,7 @@ func (e *Encoder) Encode(img *gocv.Mat, boxes []image.Rectangle, indices []int) 
 	// Iterate over each index in the list of selected boxes
 	for i := range indices {
 		index := indices[i]
-		rect := boxes[index] // Get the bounding box for the current object
+		rect := boxes[index]    // Get the bounding box for the current object
 		roi := img.Region(rect) // Extract the region of interest (ROI) from the image
 
 		// Get the dimensions of the ROI
