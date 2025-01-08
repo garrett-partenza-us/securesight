@@ -10,7 +10,7 @@ A client-server system for face prediction using **Fully Homomorphic Encryption 
 - **Server-Side (Go)**: Compute Euclidean distance in the encrypted space using **CKKS** and return predictions to the client.
 - **Concurrency**: Go routines for handling multiple faces and speeding things up.
 - **Multi-face**: Handles multiple faces per frame.
-- **Real-time**: Processes one frame every **1.7 seconds**.
+- **Real-time**: Optimal ciphertext packing processes frame every 0.2 seconds**.
 - **Encryption FTW**: Sensitive data stays encrypted the whole time. 
 
 ## Prerequisites
